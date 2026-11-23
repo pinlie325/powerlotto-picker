@@ -155,11 +155,6 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
     <h2>近期開獎分布圖 <span class="note">（橫軸號碼、縱軸期別，最新在上）</span></h2>
     <div class="chart" id="chMap"></div>
   </div>
-  <div class="panel">
-    <h2>第一區號碼總和分布</h2>
-    <div class="chart" id="chSum"></div>
-    <p class="note" id="sumNote"></p>
-  </div>
 </section>
 
 <!-- PROB -->
@@ -202,6 +197,11 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
       <h2>選號熱度分析</h2>
       <div id="anaBody" class="note">先在左邊選號，這裡會即時分析。</div>
     </div>
+  </div>
+  <div class="panel">
+    <h2>參考：第一區號碼總和分布 <span class="note">（紅線是你目前選的組合）</span></h2>
+    <div class="chart" id="chSum"></div>
+    <p class="note" id="sumNote"></p>
   </div>
   <div class="panel">
     <h2>我的選號紀錄</h2>
@@ -509,7 +509,7 @@ function renderImport(){
 }
 
 function renderDist(){
-  if(!S.n){['#chFreq','#chOmit','#chZ2','#chMap','#chSum'].forEach(s=>$(s).innerHTML='<p class="note">請先匯入資料。</p>');return;}
+  if(!S.n){['#chFreq','#chOmit','#chZ2','#chMap'].forEach(s=>$(s).innerHTML='<p class="note">請先匯入資料。</p>');return;}
   $('#distSub').textContent=`（${S.n} 期）`;
   const L=[...Array(N1)].map((_,i)=>pad(i+1));
   $('#chFreq').innerHTML=svgBars(S.cnt.slice(1),L,{ref:S.exp,valTop:true,color:i=>col(S.cls(i+1)),minW:760,h:240});
@@ -527,11 +527,10 @@ function renderDist(){
     g+=`<rect x="${lw+N1*cw+4}" y="${y}" width="${cw*1.4}" height="${rh-2}" rx="2" fill="var(--z2)"/><text x="${lw+N1*cw+4+cw*.7}" y="${y+10}" text-anchor="middle" style="fill:#fff">${d.z}</text>`;
   });
   $('#chMap').innerHTML=g+'</svg>';
-  renderSum();
 }
 function sumHist(){const sums=S.W.map(d=>d.n.reduce((a,b)=>a+b,0));const bins=[];for(let s=21;s<=213;s+=12)bins.push([s,s+11,0]);sums.forEach(v=>{const b=bins.find(b=>v>=b[0]&&v<=b[1]);if(b)b[2]++;});return{sums,bins};}
 function renderSum(){
-  if(!S.n)return;
+  if(!S.n){$('#chSum').innerHTML='<p class="note">請先匯入資料。</p>';$('#sumNote').textContent='';return;}
   const {sums,bins}=sumHist();
   const ps=pick.size===6?[...pick].reduce((a,b)=>a+b,0):null;
   const mi=ps!=null?bins.findIndex(b=>ps>=b[0]&&ps<=b[1]):null;
@@ -577,7 +576,7 @@ function quick(q){
     if(res.length<6)res=res.concat(take(all,6-res.length));pick=new Set(res);pickZ=weightedPick(all2,1,()=>1)[0];}
   refreshPick();
 }
-function refreshPick(){renderBalls();renderAnalysis();if(!$('#v-dist').classList.contains('hidden'))renderSum();}
+function refreshPick(){renderBalls();renderAnalysis();renderSum();}
 
 function renderAnalysis(){
   const arr=[...pick].sort((a,b)=>a-b);
@@ -635,7 +634,7 @@ function renderSaved(){
 }
 
 // ---------- events ----------
-function renderAll(){S=computeStats();renderImport();renderDist();renderProb();renderBalls();renderAnalysis();renderSaved();}
+function renderAll(){S=computeStats();renderImport();renderDist();renderProb();renderBalls();renderAnalysis();renderSum();renderSaved();}
 $('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t===b));['import','dist','prob','pick'].forEach(v=>$('#v-'+v).classList.toggle('hidden',v!==b.dataset.v));if(b.dataset.v==='dist')renderDist();};
 $('#win').onchange=renderAll;
 function doImport(replace){
