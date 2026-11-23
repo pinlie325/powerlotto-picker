@@ -208,7 +208,22 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
     <p class="note" id="sumNote"></p>
   </div>
   <div class="panel">
-    <h2>我的選號紀錄</h2>
+    <div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="margin:0">我的選號紀錄</h2><span id="cloudStatus" class="note">☁ 尚未連接雲端（只存在這個瀏覽器）</span></div>
+    <details id="cloudBox" style="margin-bottom:10px">
+      <summary class="note" style="cursor:pointer">☁ 雲端同步設定（Google 試算表）</summary>
+      <div style="padding:10px 0 4px">
+        <p class="note" style="margin:0 0 8px">填入 Apps Script 部署後的「網頁應用程式網址」和你在程式裡設定的同步密碼。每台電腦、手機第一次使用時各填一次。</p>
+        <div class="row" style="flex-wrap:wrap">
+          <input id="cloudUrl" placeholder="https://script.google.com/macros/s/……/exec" style="flex:1;min-width:260px;font:inherit;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+          <input id="cloudKey" type="password" placeholder="同步密碼" style="width:150px;font:inherit;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary" id="btnCloudSave">連接並同步</button>
+          <button class="btn" id="btnCloudSync">立即同步</button>
+          <button class="btn" id="btnCloudOff">中斷連接</button>
+        </div>
+      </div>
+    </details>
     <ul class="saved" id="savedList"></ul>
   </div>
 </section>
@@ -415,8 +430,36 @@ const PRESET=`11/19
 26(四)	07, 14, 22, 23, 31, 35	01`;
 
 // ---------- storage ----------
-function load(){try{const d=JSON.parse(localStorage.getItem('pl638')||'{}');draws=d.draws||[];isDemo=!!d.demo;saved=d.saved||[];}catch(e){}}
-function store(){try{localStorage.setItem('pl638',JSON.stringify({draws,demo:isDemo,saved}));}catch(e){}}
+function load(){try{const d=JSON.parse(localStorage.getItem('pl638')||'{}');draws=d.draws||[];isDemo=!!d.demo;saved=d.saved||[];tomb=d.tomb||[];}catch(e){}
+  saved.forEach(x=>{if(!x.id)x.id=newId();});
+  try{cloud=JSON.parse(localStorage.getItem('pl638cloud')||'{}');}catch(e){}cloud=Object.assign({url:'',key:''},cloud);}
+function store(){try{localStorage.setItem('pl638',JSON.stringify({draws,demo:isDemo,saved,tomb}));}catch(e){}}
+// ---------- cloud (Google Apps Script) ----------
+let tomb=[],cloud={url:'',key:''},syncing=false;
+function newId(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+const cloudOn=()=>!!(cloud.url&&cloud.key);
+function setCloud(t,kind){const e=$('#cloudStatus');e.textContent=t;e.style.color=kind==='ok'?'var(--ok)':kind==='err'?'var(--hot)':'';}
+async function cloudPost(body){
+  const r=await fetch(cloud.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({},body,{key:cloud.key}))});
+  const j=await r.json();if(!j.ok)throw new Error(j.error||'雲端回應錯誤');return j;
+}
+async function cloudSync(quiet){
+  if(!cloudOn()||syncing)return;syncing=true;setCloud('☁ 同步中…');
+  try{
+    if(tomb.length){await cloudPost({action:'delete',ids:tomb});tomb=[];}
+    let r=await cloudPost({action:'list'});
+    const ids=new Set(r.items.map(i=>i.id));
+    const up=saved.filter(s=>!s.synced&&!ids.has(s.id)).map(({synced,...x})=>x);
+    if(up.length)r=await cloudPost({action:'add',items:up});
+    saved=r.items.map(i=>Object.assign(i,{synced:true})).sort((a,b)=>String(b.t).localeCompare(String(a.t)));
+    store();renderSaved();
+    const now=new Date();setCloud(`☁ 已同步 ${saved.length} 筆（${pad(now.getHours())}:${pad(now.getMinutes())}）`,'ok');
+    if(!quiet)toast('雲端同步完成');
+  }catch(e){
+    const hint=/Failed to fetch|NetworkError|Load failed/i.test(e.message)?'（連不到雲端：請確認網址正確、Apps Script 存取權設為「所有人」；在 Claude 內開啟的版本無法連外，請改用 GitHub 網址）':'';
+    setCloud('☁ 同步失敗：'+e.message+hint,'err');store();
+  }finally{syncing=false;}
+}
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1800);}
 
 // ---------- parsing ----------
@@ -659,7 +702,7 @@ function renderTrail(){
   el.innerHTML=g+'</svg>';
 }
 function renderSaved(){
-  $('#savedList').innerHTML=saved.length?saved.map((s,i)=>{const hs=S.n?Math.round(s.n.reduce((a,x)=>a+S.heat[x],0)/6):null;return`<li><span class="note mono" style="width:120px">${s.t}</span>${s.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join('')}<span class="pb mini z2">${pad(s.z)}</span>${hs!=null?`<span class="note" style="margin-left:8px">熱度 ${hs}</span>`:''}<span style="flex:1"></span><button class="btn" data-load="${i}">載入</button><button class="btn" data-del="${i}">刪除</button></li>`}).join(''):'<li class="note">還沒有儲存的選號。</li>';
+  $('#savedList').innerHTML=saved.length?saved.map((s,i)=>{const hs=S.n?Math.round(s.n.reduce((a,x)=>a+S.heat[x],0)/6):null;return`<li><span class="note mono" style="width:130px" title="${s.synced?'已存到雲端':'只在這個瀏覽器'}">${s.synced?'☁ ':'　 '}${String(s.t).replace(/^\d{4}-/,'')}</span>${s.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join('')}<span class="pb mini z2">${pad(s.z)}</span>${hs!=null?`<span class="note" style="margin-left:8px">熱度 ${hs}</span>`:''}<span style="flex:1"></span><button class="btn" data-load="${i}">載入</button><button class="btn" data-del="${i}">刪除</button></li>`}).join(''):'<li class="note">還沒有儲存的選號。</li>';
 }
 
 // ---------- events ----------
@@ -690,11 +733,17 @@ $('#btnClear').onclick=()=>{draws=[];isDemo=false;store();$('#importMsg').textCo
 $('#balls1').onclick=e=>{const b=e.target.closest('[data-n]');if(!b)return;const x=+b.dataset.n;if(pick.has(x))pick.delete(x);else if(pick.size<6)pick.add(x);else{toast('第一區最多選 6 個');return;}refreshPick();};
 $('#balls2').onclick=e=>{const b=e.target.closest('[data-z]');if(!b)return;const x=+b.dataset.z;pickZ=pickZ===x?null:x;refreshPick();};
 document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>quick(b.dataset.q));
-$('#btnSave').onclick=()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const now=new Date();saved.unshift({n:[...pick].sort((a,b)=>a-b),z:pickZ,t:`${now.getMonth()+1}/${now.getDate()} ${pad(now.getHours())}:${pad(now.getMinutes())}`});store();renderSaved();toast('已儲存');};
+$('#btnSave').onclick=()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const now=new Date();const n=[...pick].sort((a,b)=>a-b);
+  saved.unshift({id:newId(),n,z:pickZ,t:`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,h:S.n?Math.round(n.reduce((a,x)=>a+S.heat[x],0)/6):null,synced:false});
+  store();renderSaved();toast(cloudOn()?'已儲存，同步到雲端中…':'已儲存');cloudSync(true);};
 $('#btnCopy').onclick=async()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const t=[...pick].sort((a,b)=>a-b).map(pad).join(' ')+' + '+pad(pickZ);try{await navigator.clipboard.writeText(t);toast('已複製：'+t);}catch(e){toast(t);}};
-$('#savedList').onclick=e=>{const l=e.target.dataset.load,d=e.target.dataset.del;if(l!=null){pick=new Set(saved[l].n);pickZ=saved[l].z;refreshPick();toast('已載入');}if(d!=null){saved.splice(d,1);store();renderSaved();}};
+$('#savedList').onclick=e=>{const l=e.target.dataset.load,d=e.target.dataset.del;if(l!=null){pick=new Set(saved[l].n);pickZ=saved[l].z;refreshPick();toast('已載入');}if(d!=null){const it=saved.splice(d,1)[0];if(it&&it.synced)tomb.push(it.id);store();renderSaved();cloudSync(true);}};
+$('#btnCloudSave').onclick=()=>{cloud.url=$('#cloudUrl').value.trim();cloud.key=$('#cloudKey').value;if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(cloud.url)){setCloud('☁ 網址看起來不是 Apps Script 網頁應用程式網址','err');return;}if(!cloud.key){setCloud('☁ 請輸入同步密碼','err');return;}try{localStorage.setItem('pl638cloud',JSON.stringify(cloud));}catch(e){}cloudSync();};
+$('#btnCloudSync').onclick=()=>{if(!cloudOn()){setCloud('☁ 請先填入網址和密碼','err');return;}cloudSync();};
+$('#btnCloudOff').onclick=()=>{cloud={url:'',key:''};try{localStorage.removeItem('pl638cloud');}catch(e){}$('#cloudUrl').value='';$('#cloudKey').value='';saved.forEach(x=>x.synced=false);tomb=[];store();setCloud('☁ 已中斷雲端，紀錄只存在這個瀏覽器');};
 
 load();if(!draws.length){addDraws(parseText(PRESET).out,true);}renderAll();
+$('#cloudUrl').value=cloud.url;$('#cloudKey').value=cloud.key;if(cloudOn())cloudSync(true);
 $('#btnPreset').onclick=()=>{const added=addDraws(parseText(PRESET).out,false);$('#importMsg').textContent=`內建 2026 年資料共 ${parseText(PRESET).out.length} 期，新增 ${added} 期。`;renderAll();};
 </script>
 </body>
