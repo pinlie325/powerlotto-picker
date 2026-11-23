@@ -199,6 +199,10 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
     </div>
   </div>
   <div class="panel">
+    <h2>參考：你選的號碼近期走勢 <span class="note">（近 30 期，由左到右越來越新，● 為開出）</span></h2>
+    <div class="chart" id="chTrail"></div>
+  </div>
+  <div class="panel">
     <h2>參考：第一區號碼總和分布 <span class="note">（紅線是你目前選的組合）</span></h2>
     <div class="chart" id="chSum"></div>
     <p class="note" id="sumNote"></p>
@@ -576,7 +580,7 @@ function quick(q){
     if(res.length<6)res=res.concat(take(all,6-res.length));pick=new Set(res);pickZ=weightedPick(all2,1,()=>1)[0];}
   refreshPick();
 }
-function refreshPick(){renderBalls();renderAnalysis();renderSum();}
+function refreshPick(){renderBalls();renderAnalysis();renderTrail();renderSum();}
 
 function renderAnalysis(){
   const arr=[...pick].sort((a,b)=>a-b);
@@ -629,12 +633,37 @@ function renderAnalysis(){
   }
   $('#anaBody').innerHTML=h;
 }
+
+function renderTrail(){
+  const el=$('#chTrail');
+  if(!S.n){el.innerHTML='<p class="note">請先匯入資料。</p>';return;}
+  const arr=[...pick].sort((a,b)=>a-b);
+  const rowsDef=arr.map(x=>({x,z:false})).concat(pickZ?[{x:pickZ,z:true}]:[]);
+  if(!rowsDef.length){el.innerHTML='<p class="note">在上方選號後，這裡會顯示每個號碼最近 30 期有沒有開出。</p>';return;}
+  const R=S.W.slice(-30),cw=24,rh=34,lw=56,rw=150,top=10,w=lw+R.length*cw+rw,h=top+rowsDef.length*rh+28;
+  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:760px">`;
+  // newest column highlight
+  g+=`<rect x="${lw+(R.length-1)*cw}" y="${top-4}" width="${cw}" height="${rowsDef.length*rh+4}" rx="4" fill="var(--chip)"/>`;
+  rowsDef.forEach((r,i)=>{
+    const y=top+i*rh+rh/2,colr=r.z?'var(--z2)':col(S.cls(r.x));
+    g+=`<circle cx="22" cy="${y}" r="14" fill="${r.z?'var(--z2)':'var(--hot)'}"/><text x="22" y="${y+4}" text-anchor="middle" style="fill:#fff;font-size:12px;font-weight:700">${pad(r.x)}</text>`;
+    g+=`<line x1="${lw}" x2="${lw+R.length*cw}" y1="${y}" y2="${y}" stroke="var(--line)"/>`;
+    let hits=0,lastHit=-1;
+    R.forEach((d,j)=>{const hit=r.z?d.z===r.x:d.n.includes(r.x);const cx=lw+j*cw+cw/2;
+      if(hit){hits++;lastHit=j;g+=`<circle cx="${cx}" cy="${y}" r="8" fill="${colr}"><title>${drawLabel(d)} 開出 ${pad(r.x)}</title></circle>`;}
+      else g+=`<circle cx="${cx}" cy="${y}" r="2.5" fill="var(--line)"/>`;});
+    const gap=r.z?S.omit2[r.x]:S.omit[r.x];
+    g+=`<text x="${lw+R.length*cw+12}" y="${y+4}" style="fill:var(--ink);font-size:12px">${hits} 次・遺漏 ${gap} 期</text>`;
+  });
+  R.forEach((d,j)=>{if(j%5===0||j===R.length-1){const cx=lw+j*cw+cw/2;g+=`<text x="${cx}" y="${h-8}" text-anchor="middle">${d.date?d.date.slice(5):(d.id||'').slice(-3)}</text>`;}});
+  el.innerHTML=g+'</svg>';
+}
 function renderSaved(){
   $('#savedList').innerHTML=saved.length?saved.map((s,i)=>{const hs=S.n?Math.round(s.n.reduce((a,x)=>a+S.heat[x],0)/6):null;return`<li><span class="note mono" style="width:120px">${s.t}</span>${s.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join('')}<span class="pb mini z2">${pad(s.z)}</span>${hs!=null?`<span class="note" style="margin-left:8px">熱度 ${hs}</span>`:''}<span style="flex:1"></span><button class="btn" data-load="${i}">載入</button><button class="btn" data-del="${i}">刪除</button></li>`}).join(''):'<li class="note">還沒有儲存的選號。</li>';
 }
 
 // ---------- events ----------
-function renderAll(){S=computeStats();renderImport();renderDist();renderProb();renderBalls();renderAnalysis();renderSum();renderSaved();}
+function renderAll(){S=computeStats();renderImport();renderDist();renderProb();renderBalls();renderAnalysis();renderTrail();renderSum();renderSaved();}
 $('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t===b));['import','dist','prob','pick'].forEach(v=>$('#v-'+v).classList.toggle('hidden',v!==b.dataset.v));if(b.dataset.v==='dist')renderDist();};
 $('#win').onchange=renderAll;
 function doImport(replace){
