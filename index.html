@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>威力彩選號分析機</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f4ef; --panel:#ffffff; --ink:#1d1b18; --muted:#6f6a62; --line:#e4dfd6;
+  --hot:#d9412b; --warm:#e8a43a; --cold:#3a78c9; --z2:#7a4bd1; --ok:#2f8f5b;
+  --ball:#fff; --chip:#f1ede5; --accent:#1d1b18;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#15140f; --panel:#1f1d18; --ink:#f0ece4; --muted:#a39d92; --line:#34312a;
+    --hot:#ff6a4f; --warm:#f2b552; --cold:#5c9cf0; --z2:#a27cf0; --ok:#4fbf82; --ball:#2a2822; --chip:#2a2822; --accent:#f0ece4;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC",system-ui,sans-serif;font-size:15px;line-height:1.55}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 18px 60px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+h1{font-size:28px;font-weight:900;margin:0;letter-spacing:.02em}
+h1 small{font-size:14px;font-weight:500;color:var(--muted);margin-left:8px}
+h2{font-size:17px;margin:0 0 10px;font-weight:700}
+h3{font-size:14px;margin:14px 0 6px;color:var(--muted);font-weight:500}
+.mono{font-family:"JetBrains Mono",monospace}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 14px;border-radius:999px;cursor:pointer;font:inherit;font-size:14px}
+.tab.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+button.btn{border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:7px 12px;border-radius:9px;cursor:pointer;font:inherit;font-size:14px}
+button.btn:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+textarea{width:100%;min-height:130px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);padding:10px;font-family:"JetBrains Mono",monospace;font-size:12.5px}
+select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.note{font-size:13px;color:var(--muted)}
+.warn{background:color-mix(in srgb,var(--warm) 18%,transparent);border:1px solid color-mix(in srgb,var(--warm) 50%,transparent);border-radius:10px;padding:8px 12px;font-size:13px;margin-top:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{background:var(--chip);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:20px;font-family:"JetBrains Mono",monospace}
+.stat span{font-size:12px;color:var(--muted)}
+.balls{display:grid;grid-template-columns:repeat(10,1fr);gap:7px}
+@media(max-width:520px){.balls{grid-template-columns:repeat(7,1fr)}}
+.ball{aspect-ratio:1;border-radius:50%;border:2px solid var(--line);background:var(--ball);color:var(--ink);font-family:"JetBrains Mono",monospace;font-weight:700;font-size:15px;cursor:pointer;position:relative;display:flex;align-items:center;justify-content:center;padding:0}
+.ball .h{position:absolute;bottom:-3px;left:50%;transform:translateX(-50%);width:60%;height:4px;border-radius:2px}
+.ball.sel{background:var(--hot);color:#fff;border-color:var(--hot)}
+.ball.z2.sel{background:var(--z2);border-color:var(--z2)}
+.balls.z2{grid-template-columns:repeat(8,1fr)}
+.pickline{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:40px}
+.pb{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:"JetBrains Mono",monospace;font-weight:700;color:#fff;background:var(--hot);font-size:14px}
+.pb.z2{background:var(--z2)}
+.pb.empty{background:transparent;border:2px dashed var(--line);color:var(--muted)}
+.mini{width:24px;height:24px;font-size:11px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+th{color:var(--muted);font-weight:500;cursor:pointer;user-select:none;white-space:nowrap}
+td:first-child,th:first-child{text-align:center}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700;color:#fff}
+.tag.hot{background:var(--hot)}.tag.warm{background:var(--warm)}.tag.cold{background:var(--cold)}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.meter{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--cold),var(--warm),var(--hot));position:relative;margin:8px 0 4px}
+.meter i{position:absolute;top:-4px;width:4px;height:22px;background:var(--ink);border-radius:2px;transform:translateX(-2px)}
+svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px}
+.chart{width:100%;overflow-x:auto}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-top:4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.saved li{display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.saved{list-style:none;padding:0;margin:0}
+.hidden{display:none}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
+#toast.on{opacity:1}
+.scorebig{font-size:42px;font-weight:900;font-family:"JetBrains Mono",monospace;line-height:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>威力彩選號分析機<small>第一區 1–38 選 6 ＋ 第二區 1–8 選 1</small></h1>
+  </div>
+  <div class="row">
+    <span class="note">統計範圍</span>
+    <select id="win">
+      <option value="30">近 30 期</option>
+      <option value="50">近 50 期</option>
+      <option value="100" selected>近 100 期</option>
+      <option value="200">近 200 期</option>
+      <option value="0">全部</option>
+    </select>
+  </div>
+</header>
+
+<div class="tabs" id="tabs">
+  <button class="tab on" data-v="import">① 匯入資料</button>
+  <button class="tab" data-v="dist">② 獎號分布</button>
+  <button class="tab" data-v="prob">③ 號碼機率表</button>
+  <button class="tab" data-v="pick">④ 選號與熱度分析</button>
+</div>
+
+<!-- IMPORT -->
+<section id="v-import">
+  <div class="panel">
+    <h2>匯入歷史開獎號碼</h2>
+    <p class="note">可直接上傳台灣彩券官網下載的威力彩 CSV，或把開獎資料貼在下方。每行一期，只要包含「6 個第一區號碼 ＋ 1 個第二區號碼」即可，期別與日期會自動辨識。例如：</p>
+    <pre class="mono note" style="margin:6px 0 10px;background:var(--chip);padding:8px 10px;border-radius:8px;white-space:pre-wrap">114000093, 2025/11/20, 03 11 17 24 30 36, 05
+114000094  2025-11-24  2,8,15,21,29,33  7</pre>
+    <div class="row" style="margin-bottom:8px">
+      <input type="file" id="file" accept=".csv,.txt" multiple>
+    </div>
+    <textarea id="paste" placeholder="把開獎資料貼在這裡…"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary" id="btnImport">加入資料</button>
+      <button class="btn" id="btnReplace">取代現有資料</button>
+      <button class="btn" id="btnPreset">載入內建 2026 年資料</button>
+      <button class="btn" id="btnDemo">產生模擬資料（試玩用）</button>
+      <button class="btn" id="btnClear">清空資料</button>
+    </div>
+    <div id="importMsg" class="note" style="margin-top:8px"></div>
+    <div id="demoWarn" class="warn hidden">目前使用的是<b>隨機產生的模擬資料</b>，不是真實開獎結果，只供熟悉操作。請匯入真實資料後再做分析。</div>
+  </div>
+  <div class="panel">
+    <h2>目前資料</h2>
+    <div class="stats" id="dataStats"></div>
+    <h3>最近 10 期</h3>
+    <div id="recentList"></div>
+  </div>
+</section>
+
+<!-- DIST -->
+<section id="v-dist" class="hidden">
+  <div class="panel">
+    <h2>第一區出現次數 <span class="note" id="distSub"></span></h2>
+    <div class="chart" id="chFreq"></div>
+    <div class="legend"><span><i style="background:var(--hot)"></i>熱號（明顯高於平均）</span><span><i style="background:var(--warm)"></i>溫號</span><span><i style="background:var(--cold)"></i>冷號（明顯低於平均）</span><span>— 虛線：理論期望次數</span></div>
+  </div>
+  <div class="grid2">
+    <div class="panel">
+      <h2>遺漏期數（距上次開出幾期）</h2>
+      <div class="chart" id="chOmit"></div>
+    </div>
+    <div class="panel">
+      <h2>第二區出現次數</h2>
+      <div class="chart" id="chZ2"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>近期開獎分布圖 <span class="note">（橫軸號碼、縱軸期別，最新在上）</span></h2>
+    <div class="chart" id="chMap"></div>
+  </div>
+  <div class="panel">
+    <h2>第一區號碼總和分布</h2>
+    <div class="chart" id="chSum"></div>
+    <p class="note" id="sumNote"></p>
+  </div>
+</section>
+
+<!-- PROB -->
+<section id="v-prob" class="hidden">
+  <div class="panel">
+    <h2>每個號碼的近期出現率</h2>
+    <p class="note">理論上每期每個號碼被開出的機率都是 6/38 ≈ <b>15.79%</b>（第二區 1/8 = 12.5%）。下表的「近期出現率」是在統計範圍內實際開出的比例；「偏離度」用標準差表示偏離理論值多少，±1 以內屬正常波動。</p>
+    <div style="overflow-x:auto"><table id="probTable"></table></div>
+  </div>
+  <div class="panel">
+    <h2>第二區</h2>
+    <div style="overflow-x:auto"><table id="probTable2"></table></div>
+  </div>
+</section>
+
+<!-- PICK -->
+<section id="v-pick" class="hidden">
+  <div class="grid2">
+    <div class="panel">
+      <h2>挑選號碼</h2>
+      <div class="pickline" id="pickLine"></div>
+      <h3>第一區（選 6 個）— 號碼下方色條：紅熱／黃溫／藍冷</h3>
+      <div class="balls" id="balls1"></div>
+      <h3>第二區（選 1 個）</h3>
+      <div class="balls z2" id="balls2"></div>
+      <h3>快速選號</h3>
+      <div class="row">
+        <button class="btn" data-q="rand">完全隨機</button>
+        <button class="btn" data-q="hot">追熱號</button>
+        <button class="btn" data-q="cold">補冷號</button>
+        <button class="btn" data-q="mix">熱溫冷均衡</button>
+        <button class="btn" data-q="clear">清除</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="btnSave">儲存這組</button>
+        <button class="btn" id="btnCopy">複製號碼</button>
+      </div>
+    </div>
+    <div class="panel" id="analysis">
+      <h2>選號熱度分析</h2>
+      <div id="anaBody" class="note">先在左邊選號，這裡會即時分析。</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>我的選號紀錄</h2>
+    <ul class="saved" id="savedList"></ul>
+  </div>
+</section>
+
+<div class="panel note">
+  <b>提醒：</b>每期開獎彼此獨立，過去開出的次數不會改變下一期的機率，熱號／冷號只是歷史統計的描述，不是預測。威力彩頭獎機率約為 1 / 22,085,448。比較有實際意義的是「避開大家常選的組合」（例如全部是 31 以下的生日號、連號、規律圖形），萬一中獎時比較不會和別人平分獎金。請量力而為。
+</div>
+</div>
+<div id="toast"></div>
+
+<script>
+const N1=38,K1=6,N2=8,P1=6/38,P2=1/8;
+const $=s=>document.querySelector(s);
+let draws=[];       // {id,date,n:[6 sorted],z:int,demo?}
+let isDemo=false;
+let pick=new Set(), pickZ=null;
+let saved=[];
+let sortKey='num', sortDir=1;
+const PRESET=`11/19
+26(四)	01, 12, 13, 18, 30, 33	03
+11/16
+26(一)	02, 03, 07, 08, 14, 28	02
+11/12
+26(四)	07, 09, 15, 23, 25, 35	02
+11/09
+26(一)	06, 20, 27, 28, 35, 36	02
+11/05
+26(四)	18, 19, 25, 33, 36, 37	06
+11/02
+26(一)	04, 06, 16, 19, 21, 37	07
+10/29
+26(四)	03, 06, 11, 16, 26, 37	01
+10/26
+26(一)	01, 07, 19, 26, 31, 32	03
+10/22
+26(四)	01, 09, 10, 21, 22, 31	06
+10/19
+26(一)	09, 10, 21, 24, 27, 36	08
+10/15
+26(四)	06, 12, 18, 25, 30, 33	06
+10/12
+26(一)	03, 05, 20, 22, 26, 32	03
+10/08
+26(四)	04, 23, 27, 28, 29, 38	05
+10/05
+26(一)	02, 06, 17, 21, 26, 37	06
+10/01
+26(四)	02, 04, 18, 26, 33, 37	03
+09/28
+26(一)	01, 02, 04, 17, 29, 34	01
+09/24
+26(四)	03, 08, 25, 27, 30, 31	01
+09/21
+26(一)	03, 08, 17, 24, 25, 37	06
+09/17
+26(四)	23, 26, 27, 28, 31, 37	07
+09/14
+26(一)	10, 12, 14, 16, 29, 36	08
+09/10
+26(四)	08, 17, 18, 29, 33, 38	02
+09/07
+26(一)	07, 14, 17, 22, 29, 35	02
+09/03
+26(四)	01, 06, 07, 19, 30, 33	08
+08/31
+26(一)	04, 08, 12, 19, 32, 37	02
+08/27
+26(四)	02, 07, 09, 11, 24, 36	01
+08/24
+26(一)	06, 07, 09, 23, 26, 36	07
+08/20
+26(四)	01, 02, 09, 11, 29, 35	02
+08/17
+26(一)	05, 11, 18, 19, 35, 38	08
+08/13
+26(四)	01, 03, 04, 07, 10, 19	06
+08/10
+26(一)	11, 25, 28, 30, 31, 36	03
+08/06
+26(四)	02, 07, 08, 20, 26, 33	04
+08/03
+26(一)	04, 15, 22, 26, 34, 36	07
+07/30
+26(四)	08, 14, 17, 19, 21, 23	07
+07/27
+26(一)	19, 22, 28, 31, 33, 35	07
+07/23
+26(四)	08, 10, 13, 21, 29, 31	07
+07/20
+26(一)	06, 12, 13, 23, 29, 31	02
+07/16
+26(四)	17, 23, 25, 29, 34, 36	07
+07/13
+26(一)	11, 24, 29, 32, 35, 38	06
+07/09
+26(四)	10, 22, 24, 29, 35, 37	06
+07/06
+26(一)	04, 12, 15, 24, 30, 31	01
+07/02
+26(四)	02, 11, 13, 21, 22, 35	03
+06/29
+26(一)	05, 06, 09, 15, 16, 33	05
+06/25
+26(四)	06, 10, 20, 25, 28, 32	01
+06/22
+26(一)	11, 13, 18, 19, 21, 24	07
+06/18
+26(四)	02, 08, 09, 15, 18, 23	04
+06/15
+26(一)	04, 17, 19, 25, 28, 29	06
+06/11
+26(四)	07, 22, 23, 24, 26, 33	08
+06/08
+26(一)	05, 07, 14, 25, 28, 38	05
+06/04
+26(四)	09, 12, 17, 20, 28, 35	02
+06/01
+26(一)	03, 08, 09, 15, 24, 35	04
+05/28
+26(四)	01, 02, 24, 31, 34, 38	03
+05/25
+26(一)	09, 17, 21, 24, 31, 33	03
+05/21
+26(四)	06, 14, 22, 28, 35, 38	01
+05/18
+26(一)	06, 07, 14, 25, 29, 34	04
+05/14
+26(四)	06, 08, 09, 17, 21, 29	08
+05/11
+26(一)	15, 19, 23, 26, 31, 38	05
+05/07
+26(四)	03, 14, 15, 24, 34, 38	03
+05/04
+26(一)	09, 21, 29, 32, 36, 38	02
+04/30
+26(四)	01, 04, 13, 19, 27, 30	08
+04/27
+26(一)	06, 08, 27, 33, 35, 38	02
+04/23
+26(四)	10, 14, 15, 16, 27, 33	05
+04/20
+26(一)	07, 13, 19, 34, 35, 37	08
+04/16
+26(四)	04, 11, 16, 22, 30, 38	06
+04/13
+26(一)	03, 10, 11, 16, 19, 24	05
+04/09
+26(四)	04, 09, 13, 27, 29, 34	03
+04/06
+26(一)	05, 08, 22, 27, 35, 38	04
+04/02
+26(四)	05, 15, 17, 23, 25, 34	06
+03/30
+26(一)	02, 13, 21, 22, 29, 34	01
+03/26
+26(四)	13, 14, 22, 28, 35, 38	05
+03/23
+26(一)	01, 09, 18, 28, 33, 38	05
+03/19
+26(四)	09, 13, 14, 18, 31, 34	01
+03/16
+26(一)	14, 26, 28, 31, 32, 34	01
+03/12
+26(四)	04, 09, 15, 25, 27, 31	08
+03/09
+26(一)	01, 11, 14, 17, 29, 32	08
+03/05
+26(四)	07, 11, 14, 32, 36, 38	02
+03/02
+26(一)	07, 09, 11, 23, 25, 29	05
+02/26
+26(四)	03, 19, 27, 30, 37, 38	02
+02/23
+26(一)	04, 10, 13, 24, 31, 35	02
+02/19
+26(四)	02, 03, 06, 12, 23, 27	04
+02/16
+26(一)	02, 06, 19, 33, 36, 38	03
+02/12
+26(四)	06, 10, 22, 25, 32, 35	03
+02/09
+26(一)	13, 14, 16, 33, 34, 37	02
+02/05
+26(四)	07, 22, 28, 34, 36, 37	07
+02/02
+26(一)	01, 12, 14, 15, 27, 29	05
+01/29
+26(四)	05, 10, 15, 17, 23, 25	05
+01/26
+26(一)	03, 08, 12, 26, 32, 38	04
+01/22
+26(四)	11, 17, 29, 30, 34, 35	06
+01/19
+26(一)	10, 16, 20, 23, 35, 37	05
+01/15
+26(四)	08, 10, 16, 26, 31, 38	05
+01/12
+26(一)	01, 09, 14, 17, 33, 38	03
+01/08
+26(四)	07, 17, 25, 26, 27, 33	03
+01/05
+26(一)	11, 14, 19, 25, 34, 37	04
+01/01
+26(四)	07, 14, 22, 23, 31, 35	01`;
+
+// ---------- storage ----------
+function load(){try{const d=JSON.parse(localStorage.getItem('pl638')||'{}');draws=d.draws||[];isDemo=!!d.demo;saved=d.saved||[];}catch(e){}}
+function store(){try{localStorage.setItem('pl638',JSON.stringify({draws,demo:isDemo,saved}));}catch(e){}}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),1800);}
+
+// ---------- parsing ----------
+function toHalf(s){return s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[，、]/g,',').replace(/／/g,'/');}
+function parseText(txt){
+  txt=toHalf(txt);
+  txt=txt.replace(/(^|\n)\s*(\d{1,2})\/(\d{1,2})\s*\r?\n\s*(\d{2,3})\s*[（(][一二三四五六日天][)）]/g,(m,a,mo,d,y)=>`${a}${+y>=100?+y+1911:2000+ +y}/${mo}/${d} `);
+  txt=txt.replace(/(\d{4}\/\d{1,2}\/\d{1,2})|(\d{1,2})\/(\d{1,2})\s*[（(][一二三四五六日天][)）]/g,(m,full)=>full||m);
+  const out=[];let bad=0;
+  for(let line of txt.split(/\r?\n/)){
+    if(!line.trim())continue;
+    line=line.replace(/"([^"]*)"/g,(m,c)=>c.replace(/,/g,''));
+    let date=null;
+    const dm=line.match(/(\d{2,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    if(dm){let y=+dm[1];if(y<1911)y+=1911;date=`${y}-${String(dm[2]).padStart(2,'0')}-${String(dm[3]).padStart(2,'0')}`;line=line.replace(dm[0],' ');}
+    const toks=(line.match(/\d+/g)||[]);
+    const nums=toks.map(Number);
+    let found=null;
+    for(let i=nums.length-7;i>=0;i--){
+      const six=nums.slice(i,i+6),z=nums[i+6];
+      if(six.every(x=>x>=1&&x<=38)&&new Set(six).size===6&&z>=1&&z<=8&&toks.slice(i,i+7).every(t=>t.length<=2)){found={six,z,i};break;}
+    }
+    if(!found){bad++;continue;}
+    let id=null;
+    for(let j=0;j<found.i;j++){if(toks[j].length>=6){id=toks[j];break;}}
+    out.push({id,date,n:found.six.slice().sort((a,b)=>a-b),z:found.z});
+  }
+  return {out,bad};
+}
+function keyOf(d){return d.id||(d.date+'|'+d.n.join(',')+'|'+d.z);}
+function sortDraws(){
+  draws.sort((a,b)=>{
+    if(a.id&&b.id)return a.id<b.id?-1:a.id>b.id?1:0;
+    if(a.date&&b.date)return a.date<b.date?-1:a.date>b.date?1:0;
+    return 0;
+  });
+}
+function addDraws(list,replace){
+  if(replace||isDemo){draws=[];isDemo=false;}
+  const seen=new Set(draws.map(keyOf));let added=0;
+  for(const d of list){const k=keyOf(d);if(!seen.has(k)){seen.add(k);draws.push(d);added++;}}
+  sortDraws();store();return added;
+}
+
+// ---------- stats ----------
+function windowDraws(){const w=+$('#win').value;return w&&draws.length>w?draws.slice(-w):draws;}
+function computeStats(){
+  const W=windowDraws(),n=W.length;
+  const cnt=Array(N1+1).fill(0),cnt2=Array(N2+1).fill(0),wcnt=Array(N1+1).fill(0);
+  const half=Math.max(5,n/3);
+  W.forEach((d,i)=>{const age=n-1-i,w=Math.pow(.5,age/half);d.n.forEach(x=>{cnt[x]++;wcnt[x]+=w});cnt2[d.z]++;});
+  const omit=Array(N1+1).fill(null),omit2=Array(N2+1).fill(null),last=Array(N1+1).fill(null);
+  for(let x=1;x<=N1;x++){for(let i=draws.length-1;i>=0;i--){if(draws[i].n.includes(x)){omit[x]=draws.length-1-i;last[x]=draws[i];break;}}if(omit[x]===null)omit[x]=draws.length;}
+  for(let x=1;x<=N2;x++){for(let i=draws.length-1;i>=0;i--){if(draws[i].z===x){omit2[x]=draws.length-1-i;break;}}if(omit2[x]===null)omit2[x]=draws.length;}
+  const exp=n*P1,sd=Math.sqrt(n*P1*(1-P1))||1;
+  const exp2=n*P2,sd2=Math.sqrt(n*P2*(1-P2))||1;
+  const z=cnt.map(c=>(c-exp)/sd), zz2=cnt2.map(c=>(c-exp2)/sd2);
+  // heat score 0-100: percentile rank of recency-weighted count
+  const order=[...Array(N1).keys()].map(i=>i+1).sort((a,b)=>wcnt[a]-wcnt[b]);
+  const heat=Array(N1+1).fill(50);order.forEach((x,r)=>heat[x]=Math.round(r/(N1-1)*100));
+  const cls=x=>z[x]>=1?'hot':z[x]<=-1?'cold':'warm';
+  const cls2=x=>zz2[x]>=1?'hot':zz2[x]<=-1?'cold':'warm';
+  return {W,n,cnt,cnt2,wcnt,omit,omit2,last,exp,exp2,z,zz2,heat,cls,cls2};
+}
+let S=null;
+
+// ---------- rendering helpers ----------
+const col=c=>`var(--${c})`;
+function svgBars(vals,labels,opts){
+  const w=Math.max(opts.minW||600,labels.length*(opts.bw||22)),h=opts.h||220,pt=14,pb=24,pl=30;
+  const max=Math.max(1,opts.max??Math.max(...vals,opts.ref||0))*1.08;
+  const bw=(w-pl-6)/labels.length;
+  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:${Math.min(w,opts.minW||600)}px">`;
+  const ticks=4;for(let t=0;t<=ticks;t++){const v=max/1.08*t/ticks,y=h-pb-(v/max)*(h-pt-pb);g+=`<line x1="${pl}" x2="${w}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-4}" y="${y+3}" text-anchor="end">${Math.round(v)}</text>`;}
+  vals.forEach((v,i)=>{const bh=(v/max)*(h-pt-pb),x=pl+i*bw+2,y=h-pb-bh;
+    g+=`<rect x="${x}" y="${y}" width="${bw-4}" height="${bh}" rx="3" fill="${opts.color(i)}"><title>${labels[i]}：${opts.fmt?opts.fmt(v):v}</title></rect>`;
+    if(opts.valTop)g+=`<text x="${x+(bw-4)/2}" y="${y-3}" text-anchor="middle">${v}</text>`;
+    g+=`<text x="${x+(bw-4)/2}" y="${h-8}" text-anchor="middle" style="fill:var(--ink)">${labels[i]}</text>`;});
+  if(opts.ref!=null){const y=h-pb-(opts.ref/max)*(h-pt-pb);g+=`<line x1="${pl}" x2="${w}" y1="${y}" y2="${y}" stroke="var(--ink)" stroke-dasharray="5 4" opacity=".6"/><text x="${w-4}" y="${y-4}" text-anchor="end" style="fill:var(--ink)">期望 ${opts.ref.toFixed(1)}</text>`;}
+  if(opts.marker!=null){const x=pl+opts.marker*bw+bw/2;g+=`<line x1="${x}" x2="${x}" y1="${pt}" y2="${h-pb}" stroke="var(--hot)" stroke-width="2"/><text x="${x+4}" y="${pt+8}" style="fill:var(--hot)">你的組合</text>`;}
+  return g+'</svg>';
+}
+const pad=x=>String(x).padStart(2,'0');
+function drawLabel(d){return (d.id||'')+(d.date?` ${d.date}`:'');}
+
+function renderImport(){
+  $('#demoWarn').classList.toggle('hidden',!isDemo);
+  const n=draws.length;
+  const first=draws[0],last=draws[n-1];
+  $('#dataStats').innerHTML=[
+    ['總期數',n],['最早',first?(first.date||first.id||'—'):'—'],['最新',last?(last.date||last.id||'—'):'—'],['統計範圍',S.n+' 期']
+  ].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('#recentList').innerHTML=n?`<table><tr><th>期別 / 日期</th><th style="text-align:left">第一區</th><th style="text-align:left">第二區</th></tr>${draws.slice(-10).reverse().map(d=>`<tr><td class="mono">${drawLabel(d)||'—'}</td><td style="text-align:left">${d.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join(' ')}</td><td style="text-align:left"><span class="pb mini z2">${pad(d.z)}</span></td></tr>`).join('')}</table>`:'<p class="note">還沒有資料。</p>';
+}
+
+function renderDist(){
+  if(!S.n){['#chFreq','#chOmit','#chZ2','#chMap','#chSum'].forEach(s=>$(s).innerHTML='<p class="note">請先匯入資料。</p>');return;}
+  $('#distSub').textContent=`（${S.n} 期）`;
+  const L=[...Array(N1)].map((_,i)=>pad(i+1));
+  $('#chFreq').innerHTML=svgBars(S.cnt.slice(1),L,{ref:S.exp,valTop:true,color:i=>col(S.cls(i+1)),minW:760,h:240});
+  const om=S.omit.slice(1);
+  $('#chOmit').innerHTML=svgBars(om,L,{color:i=>om[i]>=12?col('cold'):om[i]<=2?col('hot'):col('warm'),minW:560,bw:15,h:200,fmt:v=>v+' 期'});
+  $('#chZ2').innerHTML=svgBars(S.cnt2.slice(1),[1,2,3,4,5,6,7,8].map(pad),{ref:S.exp2,valTop:true,color:i=>col(S.cls2(i+1)),minW:320,bw:40,h:200});
+  // heat map recent 30
+  const R=S.W.slice(-30).reverse(),cw=19,rh=15,lw=86,w=lw+N1*cw+cw*1.6,h=R.length*rh+22;
+  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:820px">`;
+  for(let x=1;x<=N1;x++)g+=`<text x="${lw+(x-.5)*cw}" y="11" text-anchor="middle">${pad(x)}</text>`;
+  g+=`<text x="${lw+N1*cw+cw*.8}" y="11" text-anchor="middle">二區</text>`;
+  R.forEach((d,r)=>{const y=16+r*rh;
+    g+=`<text x="${lw-6}" y="${y+10}" text-anchor="end">${d.date?d.date.slice(2):(d.id||'')}</text>`;
+    for(let x=1;x<=N1;x++){const hit=d.n.includes(x);g+=`<rect x="${lw+(x-1)*cw+1}" y="${y}" width="${cw-2}" height="${rh-2}" rx="2" fill="${hit?'var(--hot)':'var(--chip)'}"/>`;}
+    g+=`<rect x="${lw+N1*cw+4}" y="${y}" width="${cw*1.4}" height="${rh-2}" rx="2" fill="var(--z2)"/><text x="${lw+N1*cw+4+cw*.7}" y="${y+10}" text-anchor="middle" style="fill:#fff">${d.z}</text>`;
+  });
+  $('#chMap').innerHTML=g+'</svg>';
+  renderSum();
+}
+function sumHist(){const sums=S.W.map(d=>d.n.reduce((a,b)=>a+b,0));const bins=[];for(let s=21;s<=213;s+=12)bins.push([s,s+11,0]);sums.forEach(v=>{const b=bins.find(b=>v>=b[0]&&v<=b[1]);if(b)b[2]++;});return{sums,bins};}
+function renderSum(){
+  if(!S.n)return;
+  const {sums,bins}=sumHist();
+  const ps=pick.size===6?[...pick].reduce((a,b)=>a+b,0):null;
+  const mi=ps!=null?bins.findIndex(b=>ps>=b[0]&&ps<=b[1]):null;
+  $('#chSum').innerHTML=svgBars(bins.map(b=>b[2]),bins.map(b=>b[0]+''),{color:()=>col('warm'),minW:600,bw:36,h:200,marker:mi>=0?mi:null,fmt:v=>v+' 期'});
+  const sorted=sums.slice().sort((a,b)=>a-b);const q=p=>sorted[Math.floor(p*(sorted.length-1))];
+  $('#sumNote').textContent=`近 ${S.n} 期總和中位數 ${q(.5)}，一半的期數落在 ${q(.25)}–${q(.75)} 之間。（橫軸為區間起點，每格 12）`;
+}
+
+function renderProb(){
+  if(!S.n){$('#probTable').innerHTML='<tr><td class="note">請先匯入資料。</td></tr>';$('#probTable2').innerHTML='';return;}
+  const rows=[...Array(N1)].map((_,i)=>{const x=i+1;return{num:x,cnt:S.cnt[x],rate:S.cnt[x]/S.n,z:S.z[x],omit:S.omit[x],heat:S.heat[x],cls:S.cls(x)}});
+  rows.sort((a,b)=>(a[sortKey]-b[sortKey])*sortDir);
+  const H=[['num','號碼'],['cnt','開出次數'],['rate','近期出現率'],['z','偏離度'],['heat','近期熱度'],['omit','遺漏期數'],['cls','狀態']];
+  const maxRate=Math.max(...rows.map(r=>r.rate));
+  $('#probTable').innerHTML=`<tr>${H.map(([k,t])=>`<th data-k="${k}">${t}${sortKey===k?(sortDir>0?' ▲':' ▼'):''}</th>`).join('')}</tr>`+rows.map(r=>`<tr>
+    <td><span class="pb mini">${pad(r.num)}</span></td><td class="mono">${r.cnt}</td>
+    <td><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><span class="mono">${(r.rate*100).toFixed(1)}%</span><div class="bar" style="width:80px"><i style="width:${r.rate/maxRate*100}%;background:${col(r.cls)}"></i></div></div></td>
+    <td class="mono">${r.z>0?'+':''}${r.z.toFixed(2)}</td><td class="mono">${r.heat}</td><td class="mono">${r.omit}</td>
+    <td><span class="tag ${r.cls}">${{hot:'熱',warm:'溫',cold:'冷'}[r.cls]}</span></td></tr>`).join('');
+  $('#probTable').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k==='cls')return;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=k==='num'?1:-1;}renderProb();});
+  $('#probTable2').innerHTML=`<tr><th>號碼</th><th>開出次數</th><th>近期出現率</th><th>偏離度</th><th>遺漏期數</th><th>狀態</th></tr>`+[...Array(N2)].map((_,i)=>{const x=i+1,c=S.cls2(x);return`<tr><td><span class="pb mini z2">${pad(x)}</span></td><td class="mono">${S.cnt2[x]}</td><td class="mono">${(S.cnt2[x]/S.n*100).toFixed(1)}%</td><td class="mono">${S.zz2[x]>0?'+':''}${S.zz2[x].toFixed(2)}</td><td class="mono">${S.omit2[x]}</td><td><span class="tag ${c}">${{hot:'熱',warm:'溫',cold:'冷'}[c]}</span></td></tr>`}).join('');
+}
+
+// ---------- picker ----------
+function renderBalls(){
+  $('#balls1').innerHTML=[...Array(N1)].map((_,i)=>{const x=i+1;return`<button class="ball ${pick.has(x)?'sel':''}" data-n="${x}" title="${S.n?`出現 ${S.cnt[x]} 次・遺漏 ${S.omit[x]} 期`:''}">${pad(x)}${S.n?`<span class="h" style="background:${col(S.cls(x))}"></span>`:''}</button>`}).join('');
+  $('#balls2').innerHTML=[...Array(N2)].map((_,i)=>{const x=i+1;return`<button class="ball z2 ${pickZ===x?'sel':''}" data-z="${x}">${pad(x)}${S.n?`<span class="h" style="background:${col(S.cls2(x))}"></span>`:''}</button>`}).join('');
+  const arr=[...pick].sort((a,b)=>a-b);
+  let line='';for(let i=0;i<6;i++)line+=arr[i]?`<span class="pb">${pad(arr[i])}</span>`:`<span class="pb empty">?</span>`;
+  line+=`<span style="margin:0 4px;color:var(--muted)">＋</span>`+(pickZ?`<span class="pb z2">${pad(pickZ)}</span>`:`<span class="pb empty">?</span>`);
+  $('#pickLine').innerHTML=line;
+}
+function weightedPick(pool,k,wf){const out=[];const p=pool.slice();while(out.length<k&&p.length){const ws=p.map(wf),t=ws.reduce((a,b)=>a+b,0);let r=Math.random()*t,i=0;while(r>ws[i]&&i<p.length-1){r-=ws[i];i++;}out.push(p.splice(i,1)[0]);}return out;}
+function quick(q){
+  const all=[...Array(N1)].map((_,i)=>i+1),all2=[...Array(N2)].map((_,i)=>i+1);
+  if(q==='clear'){pick.clear();pickZ=null;}
+  else if(q==='rand'||!S.n){pick=new Set(weightedPick(all,6,()=>1));pickZ=weightedPick(all2,1,()=>1)[0];if(q!=='rand')toast('沒有資料，先用完全隨機');}
+  else if(q==='hot'){pick=new Set(weightedPick(all,6,x=>Math.pow(S.wcnt[x]+.2,2)));pickZ=weightedPick(all2,1,x=>Math.pow(S.cnt2[x]+.5,2))[0];}
+  else if(q==='cold'){pick=new Set(weightedPick(all,6,x=>Math.pow(S.omit[x]+1,1.3)));pickZ=weightedPick(all2,1,x=>S.omit2[x]+1)[0];}
+  else if(q==='mix'){const by=c=>all.filter(x=>S.cls(x)===c);let res=[];
+    const take=(arr,k)=>weightedPick(arr.filter(x=>!res.includes(x)),k,()=>1);
+    res=res.concat(take(by('hot'),2));res=res.concat(take(by('warm'),2));res=res.concat(take(by('cold'),2));
+    if(res.length<6)res=res.concat(take(all,6-res.length));pick=new Set(res);pickZ=weightedPick(all2,1,()=>1)[0];}
+  refreshPick();
+}
+function refreshPick(){renderBalls();renderAnalysis();if(!$('#v-dist').classList.contains('hidden'))renderSum();}
+
+function renderAnalysis(){
+  const arr=[...pick].sort((a,b)=>a-b);
+  if(!arr.length&&!pickZ){$('#anaBody').innerHTML='<p class="note">先在左邊選號，這裡會即時分析。</p>';return;}
+  if(!S.n){$('#anaBody').innerHTML='<p class="note">匯入開獎資料後才能做熱度分析。</p>';return;}
+  const avgHeat=arr.length?Math.round(arr.reduce((a,x)=>a+S.heat[x],0)/arr.length):0;
+  const label=avgHeat>=67?['偏熱','hot']:avgHeat<=33?['偏冷','cold']:['溫和','warm'];
+  const nh=arr.filter(x=>S.cls(x)==='hot').length,nw=arr.filter(x=>S.cls(x)==='warm').length,nc=arr.filter(x=>S.cls(x)==='cold').length;
+  let h=`<div class="row" style="align-items:flex-end;gap:16px"><div><div class="note">組合熱度指數</div><div class="scorebig" style="color:${col(label[1])}">${avgHeat}</div></div><div style="flex:1;min-width:180px"><div class="meter"><i style="left:${avgHeat}%"></i></div><div class="note row" style="justify-content:space-between"><span>冷 0</span><span class="tag ${label[1]}">${label[0]}</span><span>100 熱</span></div></div></div>`;
+  h+=`<h3>每個號碼</h3><table><tr><th>號碼</th><th>熱度</th><th>近期出現率</th><th>遺漏</th><th>狀態</th></tr>`+arr.map(x=>`<tr><td><span class="pb mini">${pad(x)}</span></td><td><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><span class="mono">${S.heat[x]}</span><div class="bar" style="width:70px"><i style="width:${S.heat[x]}%;background:${col(S.cls(x))}"></i></div></div></td><td class="mono">${(S.cnt[x]/S.n*100).toFixed(1)}%</td><td class="mono">${S.omit[x]} 期</td><td><span class="tag ${S.cls(x)}">${{hot:'熱',warm:'溫',cold:'冷'}[S.cls(x)]}</span></td></tr>`).join('')+
+    (pickZ?`<tr><td><span class="pb mini z2">${pad(pickZ)}</span></td><td class="mono">二區</td><td class="mono">${(S.cnt2[pickZ]/S.n*100).toFixed(1)}%</td><td class="mono">${S.omit2[pickZ]} 期</td><td><span class="tag ${S.cls2(pickZ)}">${{hot:'熱',warm:'溫',cold:'冷'}[S.cls2(pickZ)]}</span></td></tr>`:'')+`</table>`;
+  if(arr.length===6){
+    const sum=arr.reduce((a,b)=>a+b,0);const {sums}=sumHist();const pct=Math.round(sums.filter(s=>s<=sum).length/sums.length*100);
+    const odd=arr.filter(x=>x%2).length,big=arr.filter(x=>x>=20).length;
+    let cons=0;for(let i=1;i<6;i++)if(arr[i]-arr[i-1]===1)cons++;
+    const lastD=draws[draws.length-1],rep=arr.filter(x=>lastD.n.includes(x)).length;
+    const zones=[[1,10],[11,20],[21,30],[31,38]].map(([a,b])=>arr.filter(x=>x>=a&&x<=b).length);
+    const bday=arr.filter(x=>x<=31).length;
+    const tails=new Set(arr.map(x=>x%10)).size;
+    // historical odd/even share
+    const oddShare=Math.round(S.W.filter(d=>d.n.filter(x=>x%2).length===odd).length/S.n*100);
+    const bigShare=Math.round(S.W.filter(d=>d.n.filter(x=>x>=20).length===big).length/S.n*100);
+    // backtest on all data
+    let m3=0,m4=0,m5=0,best=0,bestD=null;
+    draws.forEach(d=>{const m=d.n.filter(x=>pick.has(x)).length;if(m>=3)m3++;if(m>=4)m4++;if(m>=5)m5++;if(m>best){best=m;bestD=d;}});
+    let risk=0,riskWhy=[];
+    if(bday===6){risk+=2;riskWhy.push('6 個都在 31 以內（生日號）');}
+    if(cons>=2){risk+=1;riskWhy.push(`有 ${cons} 組連號`);}
+    const diffs=arr.slice(1).map((x,i)=>x-arr[i]);if(new Set(diffs).size===1){risk+=2;riskWhy.push('等差排列');}
+    if(tails<=3){risk+=1;riskWhy.push('尾數過度集中');}
+    if(rep>=3){risk+=1;riskWhy.push('和上期重複很多');}
+    const riskLv=risk>=3?['高','hot']:risk>=1?['中','warm']:['低','ok'];
+    h+=`<h3>組合結構</h3><dl class="kv">
+      <dt>熱 / 溫 / 冷</dt><dd><span class="tag hot">${nh}</span> <span class="tag warm">${nw}</span> <span class="tag cold">${nc}</span></dd>
+      <dt>號碼總和</dt><dd class="mono">${sum}　<span class="note">（落在近期第 ${pct} 百分位${pct<15||pct>85?'，較少見':'，屬常見範圍'}）</span></dd>
+      <dt>奇 : 偶</dt><dd class="mono">${odd} : ${6-odd}　<span class="note">近期約 ${oddShare}% 的期數是這個比例</span></dd>
+      <dt>大(20+) : 小</dt><dd class="mono">${big} : ${6-big}　<span class="note">近期約 ${bigShare}% 的期數是這個比例</span></dd>
+      <dt>區間分布</dt><dd class="mono">01-10:${zones[0]}　11-20:${zones[1]}　21-30:${zones[2]}　31-38:${zones[3]}</dd>
+      <dt>連號</dt><dd class="mono">${cons} 組</dd>
+      <dt>與上期重複</dt><dd class="mono">${rep} 個</dd>
+    </dl>
+    <h3>歷史回測（全部 ${draws.length} 期）</h3>
+    <dl class="kv"><dt>對中 3 個以上</dt><dd class="mono">${m3} 次</dd><dt>對中 4 個以上</dt><dd class="mono">${m4} 次</dd><dt>對中 5 個以上</dt><dd class="mono">${m5} 次</dd>
+    <dt>最佳紀錄</dt><dd class="mono">${best} 個${bestD?`　<span class="note">${drawLabel(bestD)}</span>`:''}</dd></dl>
+    <p class="note">理論上任一組號碼每期對中第一區 3 個以上的機率約 3.4%，${draws.length} 期期望約 ${(draws.length*0.0339).toFixed(1)} 次。</p>
+    <h3>撞號（分獎）風險</h3>
+    <div><span class="tag ${riskLv[1]==='ok'?'':riskLv[1]}" style="${riskLv[1]==='ok'?'background:var(--ok)':''}">${riskLv[0]}</span> <span class="note">${riskWhy.length?riskWhy.join('、')+'，這類組合常被很多人選，中獎時可能要分獎金。':'沒有明顯的熱門選號模式。'}</span></div>`;
+  }else{
+    h+=`<p class="note" style="margin-top:10px">選滿 6 個第一區號碼後，會顯示總和、奇偶、回測與撞號風險分析。</p>`;
+  }
+  $('#anaBody').innerHTML=h;
+}
+function renderSaved(){
+  $('#savedList').innerHTML=saved.length?saved.map((s,i)=>{const hs=S.n?Math.round(s.n.reduce((a,x)=>a+S.heat[x],0)/6):null;return`<li><span class="note mono" style="width:120px">${s.t}</span>${s.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join('')}<span class="pb mini z2">${pad(s.z)}</span>${hs!=null?`<span class="note" style="margin-left:8px">熱度 ${hs}</span>`:''}<span style="flex:1"></span><button class="btn" data-load="${i}">載入</button><button class="btn" data-del="${i}">刪除</button></li>`}).join(''):'<li class="note">還沒有儲存的選號。</li>';
+}
+
+// ---------- events ----------
+function renderAll(){S=computeStats();renderImport();renderDist();renderProb();renderBalls();renderAnalysis();renderSaved();}
+$('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t===b));['import','dist','prob','pick'].forEach(v=>$('#v-'+v).classList.toggle('hidden',v!==b.dataset.v));if(b.dataset.v==='dist')renderDist();};
+$('#win').onchange=renderAll;
+function doImport(replace){
+  const {out,bad}=parseText($('#paste').value);
+  if(!out.length){$('#importMsg').textContent='沒有辨識到任何一期開獎號碼，請確認每行有 6 個 1–38 的號碼加 1 個 1–8 的號碼。';return;}
+  const added=addDraws(out,replace);
+  $('#importMsg').textContent=`辨識 ${out.length} 期，新增 ${added} 期${bad?`，略過 ${bad} 行無法辨識的內容（例如標題列）`:''}。`;
+  $('#paste').value='';renderAll();
+}
+$('#btnImport').onclick=()=>doImport(false);
+$('#btnReplace').onclick=()=>doImport(true);
+$('#file').onchange=async e=>{
+  let txt='';for(const f of e.target.files){const buf=await f.arrayBuffer();let t=new TextDecoder('utf-8').decode(buf);if(t.includes(String.fromCharCode(0xFFFD))){try{t=new TextDecoder('big5').decode(buf);}catch(_){}}txt+=t+'\n';}
+  $('#paste').value=txt;doImport(false);e.target.value='';
+};
+$('#btnDemo').onclick=()=>{
+  const list=[];const start=new Date('2025-01-02');
+  for(let i=0;i<200;i++){const pool=[...Array(38)].map((_,j)=>j+1);const n=[];for(let k=0;k<6;k++)n.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+    const d=new Date(start.getTime()+Math.floor(i/2)*7*864e5+(i%2)*3*864e5);
+    list.push({id:'DEMO'+String(i+1).padStart(4,'0'),date:d.toISOString().slice(0,10),n:n.sort((a,b)=>a-b),z:1+Math.floor(Math.random()*8)});}
+  draws=list;isDemo=true;store();$('#importMsg').textContent='已產生 200 期模擬資料。';renderAll();
+};
+$('#btnClear').onclick=()=>{draws=[];isDemo=false;store();$('#importMsg').textContent='資料已清空。';renderAll();};
+$('#balls1').onclick=e=>{const b=e.target.closest('[data-n]');if(!b)return;const x=+b.dataset.n;if(pick.has(x))pick.delete(x);else if(pick.size<6)pick.add(x);else{toast('第一區最多選 6 個');return;}refreshPick();};
+$('#balls2').onclick=e=>{const b=e.target.closest('[data-z]');if(!b)return;const x=+b.dataset.z;pickZ=pickZ===x?null:x;refreshPick();};
+document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>quick(b.dataset.q));
+$('#btnSave').onclick=()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const now=new Date();saved.unshift({n:[...pick].sort((a,b)=>a-b),z:pickZ,t:`${now.getMonth()+1}/${now.getDate()} ${pad(now.getHours())}:${pad(now.getMinutes())}`});store();renderSaved();toast('已儲存');};
+$('#btnCopy').onclick=async()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const t=[...pick].sort((a,b)=>a-b).map(pad).join(' ')+' + '+pad(pickZ);try{await navigator.clipboard.writeText(t);toast('已複製：'+t);}catch(e){toast(t);}};
+$('#savedList').onclick=e=>{const l=e.target.dataset.load,d=e.target.dataset.del;if(l!=null){pick=new Set(saved[l].n);pickZ=saved[l].z;refreshPick();toast('已載入');}if(d!=null){saved.splice(d,1);store();renderSaved();}};
+
+load();if(!draws.length){addDraws(parseText(PRESET).out,true);}renderAll();
+$('#btnPreset').onclick=()=>{const added=addDraws(parseText(PRESET).out,false);$('#importMsg').textContent=`內建 2026 年資料共 ${parseText(PRESET).out.length} 期，新增 ${added} 期。`;renderAll();};
+</script>
+</body>
+</html>
