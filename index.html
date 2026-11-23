@@ -87,7 +87,15 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
     <h1>威力彩選號分析機<small>第一區 1–38 選 6 ＋ 第二區 1–8 選 1</small></h1>
   </div>
   <div class="row">
-    <span class="note">統計範圍</span>
+    <span class="note">自動同步</span>
+    <select id="autoSync" title="每隔一段時間自動從雲端抓最新的選號紀錄">
+      <option value="0">關閉</option>
+      <option value="1">每 1 分鐘</option>
+      <option value="5" selected>每 5 分鐘</option>
+      <option value="15">每 15 分鐘</option>
+    </select>
+    <button class="btn" id="btnRefresh" title="同步雲端紀錄後重新載入最新版網頁">⟳ 重新整理</button>
+    <span class="note" style="margin-left:6px">統計範圍</span>
     <select id="win">
       <option value="30">近 30 期</option>
       <option value="50">近 50 期</option>
@@ -747,6 +755,19 @@ $('#btnCloudOff').onclick=()=>{cloud={url:DEFAULT_CLOUD_URL,key:''};try{localSto
 
 load();if(!draws.length){addDraws(parseText(PRESET).out,true);}renderAll();
 $('#cloudUrl').value=cloud.url===DEFAULT_CLOUD_URL?'':cloud.url;$('#cloudKey').value=cloud.key;if(cloudOn())cloudSync(true);
+// ---------- refresh & auto sync ----------
+let autoTimer=null;
+function setAutoSync(min){clearInterval(autoTimer);autoTimer=null;if(min>0)autoTimer=setInterval(()=>{if(cloudOn()&&!document.hidden)cloudSync(true);},min*60000);try{localStorage.setItem('pl638auto',String(min));}catch(e){}}
+(()=>{let m='5';try{m=localStorage.getItem('pl638auto')??'5';}catch(e){}$('#autoSync').value=m;setAutoSync(+m);})();
+$('#autoSync').onchange=e=>{setAutoSync(+e.target.value);toast(+e.target.value?`已設定每 ${e.target.value} 分鐘自動同步`:'已關閉自動同步');};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&cloudOn())cloudSync(true);});
+$('#btnRefresh').onclick=async()=>{
+  const b=$('#btnRefresh');b.disabled=true;b.textContent='⟳ 重新整理中…';
+  if(cloudOn()){await cloudSync(true);}
+  store();
+  if(/github\.io$/.test(location.hostname)||location.protocol==='file:'){location.replace(location.pathname+'?t='+Date.now()+location.hash);}
+  else{location.reload();}
+};
 $('#btnPreset').onclick=()=>{const added=addDraws(parseText(PRESET).out,false);$('#importMsg').textContent=`內建 2026 年資料共 ${parseText(PRESET).out.length} 期，新增 ${added} 期。`;renderAll();};
 </script>
 </body>
