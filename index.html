@@ -211,18 +211,20 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
     <div class="row" style="justify-content:space-between;margin-bottom:6px"><h2 style="margin:0">我的選號紀錄</h2><span id="cloudStatus" class="note">☁ 尚未連接雲端（只存在這個瀏覽器）</span></div>
     <details id="cloudBox" style="margin-bottom:10px">
       <summary class="note" style="cursor:pointer">☁ 雲端同步設定（Google 試算表）</summary>
-      <div style="padding:10px 0 4px">
-        <p class="note" style="margin:0 0 8px">填入 Apps Script 部署後的「網頁應用程式網址」和你在程式裡設定的同步密碼。每台電腦、手機第一次使用時各填一次。</p>
-        <div class="row" style="flex-wrap:wrap">
-          <input id="cloudUrl" placeholder="https://script.google.com/macros/s/……/exec" style="flex:1;min-width:260px;font:inherit;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
-          <input id="cloudKey" type="password" placeholder="同步密碼" style="width:150px;font:inherit;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+      <form id="cloudForm" style="padding:10px 0 4px" autocomplete="on">
+        <p class="note" style="margin:0 0 8px">輸入同步密碼後按「連接並同步」。每台電腦、手機只要輸入一次，瀏覽器會記住。</p>
+        <input type="text" name="username" value="威力彩選號同步" autocomplete="username" style="display:none" readonly>
+        <div class="row">
+          <input id="cloudKey" name="password" type="password" autocomplete="current-password" placeholder="同步密碼" style="width:220px;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+          <button class="btn primary" id="btnCloudSave" type="submit">連接並同步</button>
+          <button class="btn" id="btnCloudSync" type="button">立即同步</button>
+          <button class="btn" id="btnCloudOff" type="button">中斷連接</button>
         </div>
-        <div class="row" style="margin-top:8px">
-          <button class="btn primary" id="btnCloudSave">連接並同步</button>
-          <button class="btn" id="btnCloudSync">立即同步</button>
-          <button class="btn" id="btnCloudOff">中斷連接</button>
-        </div>
-      </div>
+        <details style="margin-top:10px"><summary class="note" style="cursor:pointer">進階：更換雲端網址</summary>
+          <input id="cloudUrl" autocomplete="off" placeholder="https://script.google.com/macros/s/……/exec" style="width:100%;margin-top:6px;font:inherit;font-size:12px;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+          <p class="note" style="margin:4px 0 0">一般不用改。留空就會使用內建的雲端網址。</p>
+        </details>
+      </form>
     </details>
     <ul class="saved" id="savedList"></ul>
   </div>
@@ -432,10 +434,11 @@ const PRESET=`11/19
 // ---------- storage ----------
 function load(){try{const d=JSON.parse(localStorage.getItem('pl638')||'{}');draws=d.draws||[];isDemo=!!d.demo;saved=d.saved||[];tomb=d.tomb||[];}catch(e){}
   saved.forEach(x=>{if(!x.id)x.id=newId();});
-  try{cloud=JSON.parse(localStorage.getItem('pl638cloud')||'{}');}catch(e){}cloud=Object.assign({url:'',key:''},cloud);}
+  try{cloud=JSON.parse(localStorage.getItem('pl638cloud')||'{}');}catch(e){}cloud=Object.assign({url:'',key:''},cloud);if(!cloud.url)cloud.url=DEFAULT_CLOUD_URL;}
 function store(){try{localStorage.setItem('pl638',JSON.stringify({draws,demo:isDemo,saved,tomb}));}catch(e){}}
 // ---------- cloud (Google Apps Script) ----------
-let tomb=[],cloud={url:'',key:''},syncing=false;
+const DEFAULT_CLOUD_URL='https://script.google.com/macros/s/AKfycbzQRyB73NHU2AxURY3_HecBeHOeyLMTyzLJ0UuLGm7QpRhzgA2T250cREzt7tVMduZV/exec';
+let tomb=[],cloud={url:DEFAULT_CLOUD_URL,key:''},syncing=false;
 function newId(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 const cloudOn=()=>!!(cloud.url&&cloud.key);
 function setCloud(t,kind){const e=$('#cloudStatus');e.textContent=t;e.style.color=kind==='ok'?'var(--ok)':kind==='err'?'var(--hot)':'';}
@@ -738,12 +741,12 @@ $('#btnSave').onclick=()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 �
   store();renderSaved();toast(cloudOn()?'已儲存，同步到雲端中…':'已儲存');cloudSync(true);};
 $('#btnCopy').onclick=async()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const t=[...pick].sort((a,b)=>a-b).map(pad).join(' ')+' + '+pad(pickZ);try{await navigator.clipboard.writeText(t);toast('已複製：'+t);}catch(e){toast(t);}};
 $('#savedList').onclick=e=>{const l=e.target.dataset.load,d=e.target.dataset.del;if(l!=null){pick=new Set(saved[l].n);pickZ=saved[l].z;refreshPick();toast('已載入');}if(d!=null){const it=saved.splice(d,1)[0];if(it&&it.synced)tomb.push(it.id);store();renderSaved();cloudSync(true);}};
-$('#btnCloudSave').onclick=()=>{cloud.url=$('#cloudUrl').value.trim();cloud.key=$('#cloudKey').value;if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(cloud.url)){setCloud('☁ 網址看起來不是 Apps Script 網頁應用程式網址','err');return;}if(!cloud.key){setCloud('☁ 請輸入同步密碼','err');return;}try{localStorage.setItem('pl638cloud',JSON.stringify(cloud));}catch(e){}cloudSync();};
+$('#cloudForm').onsubmit=e=>{e.preventDefault();cloud.url=$('#cloudUrl').value.trim()||DEFAULT_CLOUD_URL;cloud.key=$('#cloudKey').value;if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(cloud.url)){setCloud('☁ 雲端網址格式不對，請清空「進階」裡的網址','err');return;}if(!cloud.key){setCloud('☁ 請輸入同步密碼','err');return;}try{localStorage.setItem('pl638cloud',JSON.stringify(cloud));}catch(e){}cloudSync();};
 $('#btnCloudSync').onclick=()=>{if(!cloudOn()){setCloud('☁ 請先填入網址和密碼','err');return;}cloudSync();};
-$('#btnCloudOff').onclick=()=>{cloud={url:'',key:''};try{localStorage.removeItem('pl638cloud');}catch(e){}$('#cloudUrl').value='';$('#cloudKey').value='';saved.forEach(x=>x.synced=false);tomb=[];store();setCloud('☁ 已中斷雲端，紀錄只存在這個瀏覽器');};
+$('#btnCloudOff').onclick=()=>{cloud={url:DEFAULT_CLOUD_URL,key:''};try{localStorage.removeItem('pl638cloud');}catch(e){}$('#cloudUrl').value='';$('#cloudKey').value='';saved.forEach(x=>x.synced=false);tomb=[];store();setCloud('☁ 已中斷雲端，紀錄只存在這個瀏覽器');};
 
 load();if(!draws.length){addDraws(parseText(PRESET).out,true);}renderAll();
-$('#cloudUrl').value=cloud.url;$('#cloudKey').value=cloud.key;if(cloudOn())cloudSync(true);
+$('#cloudUrl').value=cloud.url===DEFAULT_CLOUD_URL?'':cloud.url;$('#cloudKey').value=cloud.key;if(cloudOn())cloudSync(true);
 $('#btnPreset').onclick=()=>{const added=addDraws(parseText(PRESET).out,false);$('#importMsg').textContent=`內建 2026 年資料共 ${parseText(PRESET).out.length} 期，新增 ${added} 期。`;renderAll();};
 </script>
 </body>
