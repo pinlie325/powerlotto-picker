@@ -482,12 +482,13 @@ const PRESET=`11/19
 
 // ---------- storage ----------
 function load(){try{const d=JSON.parse(localStorage.getItem('pl638')||'{}');draws=d.draws||[];isDemo=!!d.demo;saved=d.saved||[];tomb=d.tomb||[];}catch(e){}
-  saved.forEach(x=>{if(!x.id)x.id=newId();});
+  saved.forEach(x=>{if(!x.id)x.id=newId();x.t=normT(x.t);});
   try{cloud=JSON.parse(localStorage.getItem('pl638cloud')||'{}');}catch(e){}cloud=Object.assign({url:'',key:''},cloud);if(!cloud.url)cloud.url=DEFAULT_CLOUD_URL;}
 function store(){try{localStorage.setItem('pl638',JSON.stringify({draws,demo:isDemo,saved,tomb}));}catch(e){}}
 // ---------- cloud (Google Apps Script) ----------
 const DEFAULT_CLOUD_URL='https://script.google.com/macros/s/AKfycbzQRyB73NHU2AxURY3_HecBeHOeyLMTyzLJ0UuLGm7QpRhzgA2T250cREzt7tVMduZV/exec';
 let tomb=[],cloud={url:DEFAULT_CLOUD_URL,key:''},syncing=false;
+function normT(t){t=String(t||'');if(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(t))return t;const m=t.match(/^(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})$/);if(m)return t;const d=new Date(t.replace(/\s*\(.*\)\s*$/,''));if(!isNaN(d))return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;return t;}
 function newId(){return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 const cloudOn=()=>!!(cloud.url&&cloud.key);
 function setCloud(t,kind){const e=$('#cloudStatus');e.textContent=t;e.style.color=kind==='ok'?'var(--ok)':kind==='err'?'var(--hot)':'';}
@@ -503,7 +504,7 @@ async function cloudSync(quiet){
     const ids=new Set(r.items.map(i=>i.id));
     const up=saved.filter(s=>!s.synced&&!ids.has(s.id)).map(({synced,...x})=>x);
     if(up.length)r=await cloudPost({action:'add',items:up});
-    saved=r.items.map(i=>Object.assign(i,{synced:true})).sort((a,b)=>String(b.t).localeCompare(String(a.t)));
+    saved=r.items.map(i=>Object.assign(i,{t:normT(i.t),synced:true})).sort((a,b)=>String(b.t).localeCompare(String(a.t)));
     store();renderSaved();
     const now=new Date();setCloud(`☁ 已同步 ${saved.length} 筆（${pad(now.getHours())}:${pad(now.getMinutes())}）`,'ok');
     if(!quiet)toast('雲端同步完成');
