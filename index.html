@@ -306,9 +306,18 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
   <div class="grid2">
     <div class="panel">
       <h2>新增最新一期開獎號碼</h2>
-      <p class="note" style="margin-top:0">開獎後把號碼輸入這裡：日期、6 個第一區號碼、第二區號碼，用空白或逗號隔開。</p>
-      <div class="row"><input id="newDraw" placeholder="2026-11-23 03 11 17 24 30 36 05" style="flex:1;min-width:240px;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="btn primary" id="btnAddDraw">加入</button></div>
+      <div class="row" style="margin-bottom:8px"><span class="note">開獎日期</span><input type="date" id="ndDate" style="font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><span class="note" id="ndDow"></span></div>
+      <div class="pickline" id="ndLine"></div>
+      <h3>第一區（點 6 個）</h3>
+      <div class="balls" id="ndBalls1"></div>
+      <h3>第二區（點 1 個）</h3>
+      <div class="balls z2" id="ndBalls2"></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="btnAddDraw">加入這一期</button><button class="btn" id="ndClear">清除</button></div>
       <div id="addDrawMsg" class="note" style="margin-top:6px"></div>
+      <details style="margin-top:10px"><summary class="note" style="cursor:pointer">或直接輸入文字</summary>
+        <p class="note" style="margin:6px 0">日期、6 個第一區號碼、第二區號碼，用空白或逗號隔開。</p>
+        <div class="row"><input id="newDraw" placeholder="2026-11-23 03 11 17 24 30 36 05" style="flex:1;min-width:200px;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="btn" id="btnAddDrawText">加入</button></div>
+      </details>
       <h3>目前資料中最新一期</h3>
       <div id="latestDraw"></div>
     </div>
@@ -892,10 +901,36 @@ $('#btnSave').onclick=()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 �
   store();renderSaved();toast(cloudOn()?'已儲存，同步到雲端中…':'已儲存');cloudSync(true);};
 $('#btnCopy').onclick=async()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const t=[...pick].sort((a,b)=>a-b).map(pad).join(' ')+' + '+pad(pickZ);try{await navigator.clipboard.writeText(t);toast('已複製：'+t);}catch(e){toast(t);}};
 $('#savedList').onclick=e=>{const l=e.target.dataset.load,d=e.target.dataset.del;if(l!=null){pick=new Set(saved[l].n);pickZ=saved[l].z;refreshPick();toast('已載入');}if(d!=null){const it=saved.splice(d,1)[0];if(it&&it.synced)tomb.push(it.id);store();renderSaved();cloudSync(true);}};
-$('#btnAddDraw').onclick=()=>{const {out}=parseText($('#newDraw').value);const msg=$('#addDrawMsg');
+$('#btnAddDrawText').onclick=()=>{const {out}=parseText($('#newDraw').value);const msg=$('#addDrawMsg');
   if(!out.length){msg.textContent='看不懂這組號碼，請確認有 6 個 1–38 的號碼加 1 個 1–8 的第二區。';msg.style.color='var(--hot)';return;}
   if(out.some(d=>!d.date)){msg.textContent='請加上開獎日期，例如 2026-11-23。';msg.style.color='var(--hot)';return;}
   const added=addDraws(out,false);msg.style.color='var(--ok)';msg.textContent=added?`已加入 ${out.map(d=>d.date).join('、')}，對獎結果已更新。`:'這一期已經在資料裡了。';$('#newDraw').value='';renderAll();};
+// ---------- tap-to-enter draw ----------
+let ndSet=new Set(),ndZ=null;
+const DOW='日一二三四五六';
+function suggestDrawDate(){const now=new Date();const d=new Date(now);if([1,4].includes(d.getDay())&&now.getHours()*60+now.getMinutes()<20*60+30)d.setDate(d.getDate()-1);while(![1,4].includes(d.getDay()))d.setDate(d.getDate()-1);return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function renderNd(){
+  $('#ndBalls1').innerHTML=[...Array(N1)].map((_,i)=>`<button class="ball ${ndSet.has(i+1)?'sel':''}" data-nd="${i+1}">${pad(i+1)}</button>`).join('');
+  $('#ndBalls2').innerHTML=[...Array(N2)].map((_,i)=>`<button class="ball z2 ${ndZ===i+1?'sel':''}" data-ndz="${i+1}">${pad(i+1)}</button>`).join('');
+  const arr=[...ndSet].sort((a,b)=>a-b);let line='';for(let i=0;i<6;i++)line+=arr[i]?`<span class="pb">${pad(arr[i])}</span>`:`<span class="pb empty">?</span>`;
+  line+=`<span style="margin:0 4px;color:var(--muted)">＋</span>`+(ndZ?`<span class="pb z2">${pad(ndZ)}</span>`:`<span class="pb empty">?</span>`);
+  $('#ndLine').innerHTML=line;
+  const v=$('#ndDate').value;$('#ndDow').textContent=v?`（星期${DOW[new Date(v+'T12:00:00').getDay()]}）`+(draws.some(d=>d.date===v)?' 已在資料中':''):'';
+}
+$('#ndBalls1').onclick=e=>{const b=e.target.closest('[data-nd]');if(!b)return;const x=+b.dataset.nd;if(ndSet.has(x))ndSet.delete(x);else if(ndSet.size<6)ndSet.add(x);else{toast('第一區最多 6 個');return;}renderNd();};
+$('#ndBalls2').onclick=e=>{const b=e.target.closest('[data-ndz]');if(!b)return;const x=+b.dataset.ndz;ndZ=ndZ===x?null:x;renderNd();};
+$('#ndDate').onchange=renderNd;
+$('#ndClear').onclick=()=>{ndSet.clear();ndZ=null;renderNd();};
+$('#btnAddDraw').onclick=()=>{const msg=$('#addDrawMsg');const date=$('#ndDate').value;
+  if(!date){msg.style.color='var(--hot)';msg.textContent='請選擇開獎日期。';return;}
+  if(ndSet.size!==6||!ndZ){msg.style.color='var(--hot)';msg.textContent='請點滿 6 個第一區號碼和 1 個第二區號碼。';return;}
+  if(draws.some(d=>d.date===date)){msg.style.color='var(--hot)';msg.textContent=`${date} 已經在資料裡了。`;return;}
+  const dow=new Date(date+'T12:00:00').getDay();
+  const added=addDraws([{id:null,date,n:[...ndSet].sort((a,b)=>a-b),z:ndZ}],false);
+  msg.style.color='var(--ok)';msg.textContent=added?`已加入 ${date}${[1,4].includes(dow)?'':'（提醒：這天不是星期一或四）'}，對獎結果已更新。`:'這一期已經在資料裡了。';
+  ndSet.clear();ndZ=null;renderAll();renderNd();toast('已加入開獎號碼');};
+$('#ndDate').value=suggestDrawDate();renderNd();
+
 $('#btnCheck').onclick=()=>{const t=toHalf($('#ticketIn').value);const nums=(t.match(/\d+/g)||[]).map(Number);const out=$('#ticketResult');
   const n=nums.slice(0,6),z=nums[6];
   if(nums.length!==7||new Set(n).size!==6||n.some(x=>x<1||x>38)||!(z>=1&&z<=8)){out.innerHTML='<p class="note" style="color:var(--hot)">請輸入 6 個不重複的 1–38 號碼，最後再加 1 個 1–8 的第二區號碼。</p>';return;}
@@ -903,14 +938,14 @@ $('#btnCheck').onclick=()=>{const t=toHalf($('#ticketIn').value);const nums=(t.m
   const r=check(n.sort((a,b)=>a-b),z,d);
   out.innerHTML=`<div class="row" style="margin-bottom:6px"><span class="note">你的號碼</span>${ballsHit(n,z,d)}</div><div class="row" style="margin-bottom:8px"><span class="note">開獎號碼</span>${drawBalls(d)}</div>`+(r.pr?`<div><span class="tag win" style="font-size:15px;padding:3px 12px">${r.pr.name}</span> <b class="mono">${money(r.pr.amt)}</b> <span class="note">（第一區中 ${r.hit.length} 個${r.s?'，第二區對中':''}）</span></div>`:`<div><span class="tag none">未中獎</span> <span class="note">第一區中 ${r.hit.length} 個${r.s?'，第二區對中':'，第二區未中'}</span></div>`);};
 $('#ticketIn').onkeydown=e=>{if(e.key==='Enter')$('#btnCheck').click();};
-$('#newDraw').onkeydown=e=>{if(e.key==='Enter')$('#btnAddDraw').click();};
+$('#newDraw').onkeydown=e=>{if(e.key==='Enter')$('#btnAddDrawText').click();};
 $('#prizeMode').onchange=renderPrize;$('#prizeDraw').onchange=renderPrize;
 $('#cloudForm').onsubmit=e=>{e.preventDefault();cloud.url=$('#cloudUrl').value.trim()||DEFAULT_CLOUD_URL;cloud.key=$('#cloudKey').value;if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(cloud.url)){setCloud('☁ 雲端網址格式不對，請清空「進階」裡的網址','err');return;}if(!cloud.key){setCloud('☁ 請輸入同步密碼','err');return;}try{localStorage.setItem('pl638cloud',JSON.stringify(cloud));}catch(e){}cloudSync();};
 $('#btnCloudSync').onclick=()=>{if(!cloudOn()){setCloud('☁ 請先填入網址和密碼','err');return;}cloudSync();};
 $('#btnCloudOff').onclick=()=>{cloud={url:DEFAULT_CLOUD_URL,key:''};try{localStorage.removeItem('pl638cloud');}catch(e){}$('#cloudUrl').value='';$('#cloudKey').value='';saved.forEach(x=>x.synced=false);tomb=[];store();setCloud('☁ 已中斷雲端，紀錄只存在這個瀏覽器');};
 
 let rzT=null,lastM=null;window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{const m=isMobile();if(m!==lastM){lastM=m;renderDist();renderTrail();renderSum();}},200);});
-load();if(!draws.length){addDraws(parseText(PRESET).out,true);}renderAll();
+load();if(!draws.length){addDraws(parseText(PRESET).out,true);}renderAll();renderNd();
 $('#cloudUrl').value=cloud.url===DEFAULT_CLOUD_URL?'':cloud.url;$('#cloudKey').value=cloud.key;if(cloudOn())cloudSync(true);
 // ---------- refresh & auto sync ----------
 let autoTimer=null;
