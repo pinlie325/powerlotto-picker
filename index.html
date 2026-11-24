@@ -83,6 +83,9 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
 .hidden{display:none}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
 #toast.on{opacity:1}
+.btn.mini{padding:3px 9px!important;min-height:0!important;font-size:12px}
+.btn.danger{background:var(--hot);color:#fff;border-color:var(--hot)}
+.editbar{background:color-mix(in srgb,var(--warm) 18%,transparent);border:1px solid color-mix(in srgb,var(--warm) 50%,transparent);border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:10px}
 #importBox summary::-webkit-details-marker{display:none}
 #importBox[open] summary .note{visibility:hidden}
 .ts{display:none}
@@ -317,6 +320,7 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
   <div class="grid2">
     <div class="panel">
       <h2>新增最新一期開獎號碼</h2>
+      <div id="ndEditBar" class="editbar hidden"></div>
       <div class="row" style="margin-bottom:8px"><span class="note">開獎日期</span><input type="date" id="ndDate" style="font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><span class="note" id="ndDow"></span></div>
       <div class="pickline" id="ndLine"></div>
       <h3>第一區（點 6 個）</h3>
@@ -680,6 +684,7 @@ function svgBars(vals,labels,opts){
 const pad=x=>String(x).padStart(2,'0');
 function drawLabel(d){return (d.id||'')+(d.date?` ${d.date}`:'');}
 
+function drawActions(d){const k=encodeURIComponent(keyOf(d));return`<button class="btn mini" data-dedit="${k}">修改</button> <button class="btn mini" data-ddel="${k}">刪除</button>`;}
 function renderImport(){
   $('#demoWarn').classList.toggle('hidden',!isDemo);
   const n=draws.length;
@@ -687,7 +692,7 @@ function renderImport(){
   $('#dataStats').innerHTML=[
     ['總期數',n],['最早',first?(first.date||first.id||'—'):'—'],['最新',last?(last.date||last.id||'—'):'—'],['統計範圍',S.n+' 期']
   ].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
-  $('#recentList').innerHTML=n?`<table><tr><th>期別 / 日期</th><th style="text-align:left">第一區</th><th style="text-align:left">第二區</th></tr>${draws.slice(-10).reverse().map(d=>`<tr><td class="mono">${drawLabel(d)||'—'}</td><td style="text-align:left">${d.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join(' ')}</td><td style="text-align:left"><span class="pb mini z2">${pad(d.z)}</span></td></tr>`).join('')}</table>`:'<p class="note">還沒有資料。</p>';
+  $('#recentList').innerHTML=n?`<table><tr><th>日期</th><th style="text-align:left">開獎號碼</th><th></th></tr>${draws.slice(-10).reverse().map(d=>`<tr><td class="mono" style="white-space:nowrap">${(d.date||d.id||'—').replace(/^\d{4}-/,'')}</td><td style="text-align:left;white-space:nowrap">${drawBalls(d)}</td><td style="white-space:nowrap">${drawActions(d)}</td></tr>`).join('')}</table>`:'<p class="note">還沒有資料。</p>';
 }
 
 function renderDist(){
@@ -856,7 +861,7 @@ function drawOptions(sel){const ds=draws.filter(d=>d.date||d.id).slice().reverse
 function findDraw(k){return draws.find(d=>keyOf(d)===k);}
 function renderPrize(){
   const last=draws[draws.length-1];
-  $('#latestDraw').innerHTML=last?`<div class="row"><span class="mono note">${drawLabel(last)}</span>${drawBalls(last)}</div>`:'<p class="note">還沒有資料。</p>';
+  $('#latestDraw').innerHTML=last?`<div class="row"><span class="mono note">${drawLabel(last)}</span>${drawBalls(last)}${drawActions(last)}</div>`:'<p class="note">還沒有資料。</p>';
   const tv=$('#ticketDraw').value,pv=$('#prizeDraw').value;
   $('#ticketDraw').innerHTML=drawOptions(tv);$('#prizeDraw').innerHTML=drawOptions(pv);
   const mode=$('#prizeMode').value;$('#prizeDraw').classList.toggle('hidden',mode!=='sel');
@@ -927,20 +932,40 @@ function renderNd(){
   const arr=[...ndSet].sort((a,b)=>a-b);let line='';for(let i=0;i<6;i++)line+=arr[i]?`<span class="pb">${pad(arr[i])}</span>`:`<span class="pb empty">?</span>`;
   line+=`<span style="margin:0 4px;color:var(--muted)">＋</span>`+(ndZ?`<span class="pb z2">${pad(ndZ)}</span>`:`<span class="pb empty">?</span>`);
   $('#ndLine').innerHTML=line;
-  const v=$('#ndDate').value;$('#ndDow').textContent=v?`（星期${DOW[new Date(v+'T12:00:00').getDay()]}）`+(draws.some(d=>d.date===v)?' 已在資料中':''):'';
+  const v=$('#ndDate').value;$('#ndDow').textContent=v?`（星期${DOW[new Date(v+'T12:00:00').getDay()]}）`+(typeof ndEditKey!=='undefined'&&ndEditKey!=null?' 修改中':draws.some(d=>d.date===v)?' 已在資料中':''):'';
 }
 $('#ndBalls1').onclick=e=>{const b=e.target.closest('[data-nd]');if(!b)return;const x=+b.dataset.nd;if(ndSet.has(x))ndSet.delete(x);else if(ndSet.size<6)ndSet.add(x);else{toast('第一區最多 6 個');return;}renderNd();};
 $('#ndBalls2').onclick=e=>{const b=e.target.closest('[data-ndz]');if(!b)return;const x=+b.dataset.ndz;ndZ=ndZ===x?null:x;renderNd();};
 $('#ndDate').onchange=renderNd;
-$('#ndClear').onclick=()=>{ndSet.clear();ndZ=null;renderNd();};
 $('#btnAddDraw').onclick=()=>{const msg=$('#addDrawMsg');const date=$('#ndDate').value;
   if(!date){msg.style.color='var(--hot)';msg.textContent='請選擇開獎日期。';return;}
   if(ndSet.size!==6||!ndZ){msg.style.color='var(--hot)';msg.textContent='請點滿 6 個第一區號碼和 1 個第二區號碼。';return;}
-  if(draws.some(d=>d.date===date)){msg.style.color='var(--hot)';msg.textContent=`${date} 已經在資料裡了。`;return;}
+  const n6=[...ndSet].sort((a,b)=>a-b);
+  if(ndEditKey!=null){const i=draws.findIndex(d=>keyOf(d)===ndEditKey);
+    if(i<0){msg.style.color='var(--hot)';msg.textContent='找不到要修改的那一期，可能已被刪除。';exitEdit();return;}
+    if(draws.some((d,j)=>j!==i&&d.date===date)){msg.style.color='var(--hot)';msg.textContent=`${date} 已經有另一筆資料了。`;return;}
+    draws[i]={id:draws[i].id,date,n:n6,z:ndZ};sortDraws();store();
+    exitEdit();msg.style.color='var(--ok)';msg.textContent=`已修改 ${date}，對獎結果已更新。`;renderAll();renderNd();toast('已儲存修改');return;}
+  if(draws.some(d=>d.date===date)){msg.style.color='var(--hot)';msg.textContent=`${date} 已經在資料裡了。要更正請按那一期旁邊的「修改」。`;return;}
   const dow=new Date(date+'T12:00:00').getDay();
   const added=addDraws([{id:null,date,n:[...ndSet].sort((a,b)=>a-b),z:ndZ}],false);
   msg.style.color='var(--ok)';msg.textContent=added?`已加入 ${date}${[1,4].includes(dow)?'':'（提醒：這天不是星期一或四）'}，對獎結果已更新。`:'這一期已經在資料裡了。';
   ndSet.clear();ndZ=null;renderAll();renderNd();toast('已加入開獎號碼');};
+let ndEditKey=null;
+function exitEdit(){ndEditKey=null;ndSet.clear();ndZ=null;$('#btnAddDraw').textContent='加入這一期';$('#ndClear').textContent='清除';$('#ndEditBar').classList.add('hidden');$('#ndDate').value=suggestDrawDate();renderNd();}
+function startEdit(k){const d=draws.find(x=>keyOf(x)===k);if(!d)return;
+  ndEditKey=k;ndSet=new Set(d.n);ndZ=d.z;$('#ndDate').value=d.date||'';
+  $('#btnAddDraw').textContent='儲存修改';$('#ndClear').textContent='取消修改';
+  const bar=$('#ndEditBar');bar.textContent=`正在修改 ${d.date||d.id} 這一期：點選正確的號碼後按「儲存修改」。`;bar.classList.remove('hidden');$('#addDrawMsg').textContent='';
+  document.querySelector('.tab[data-v=prize]').click();renderNd();
+  setTimeout(()=>$('#ndEditBar').scrollIntoView({behavior:'smooth',block:'center'}),50);}
+$('#ndClear').onclick=()=>{if(ndEditKey!=null){exitEdit();return;}ndSet.clear();ndZ=null;renderNd();};
+document.addEventListener('click',e=>{
+  const ed=e.target.closest('[data-dedit]');if(ed){startEdit(decodeURIComponent(ed.dataset.dedit));return;}
+  const dl=e.target.closest('[data-ddel]');if(!dl)return;
+  if(!dl.classList.contains('danger')){dl.classList.add('danger');dl.textContent='確定刪除？';clearTimeout(dl._t);dl._t=setTimeout(()=>{dl.classList.remove('danger');dl.textContent='刪除';},3000);return;}
+  const k=decodeURIComponent(dl.dataset.ddel);const d=draws.find(x=>keyOf(x)===k);
+  draws=draws.filter(x=>keyOf(x)!==k);store();if(ndEditKey===k)exitEdit();renderAll();renderNd();toast(`已刪除 ${d?(d.date||d.id):''}`);});
 $('#ndDate').value=suggestDrawDate();renderNd();
 
 $('#btnCheck').onclick=()=>{const t=toHalf($('#ticketIn').value);const nums=(t.match(/\d+/g)||[]).map(Number);const out=$('#ticketResult');
