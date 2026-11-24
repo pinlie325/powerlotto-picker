@@ -34,7 +34,7 @@ h3{font-size:14px;margin:14px 0 6px;color:var(--muted);font-weight:500}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .tab{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 14px;border-radius:999px;cursor:pointer;font:inherit;font-size:14px}
 .tab.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
-button.btn{border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:7px 12px;border-radius:9px;cursor:pointer;font:inherit;font-size:14px}
+button.btn,label.btn{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--chip);color:var(--ink);padding:7px 12px;border-radius:9px;cursor:pointer;font:inherit;font-size:14px}
 button.btn:hover{border-color:var(--muted)}
 button.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -83,6 +83,8 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
 .hidden{display:none}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
 #toast.on{opacity:1}
+#importBox summary::-webkit-details-marker{display:none}
+#importBox[open] summary .note{visibility:hidden}
 .ts{display:none}
 .grid2>*{min-width:0}
 .panel{min-width:0}
@@ -107,7 +109,7 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
   .tl{display:none}.ts{display:inline}
   /* touch-friendly controls; 16px stops iOS zoom */
   input,select,textarea{font-size:16px!important}
-  button.btn{min-height:40px;padding:8px 12px}
+  button.btn,label.btn{min-height:40px;padding:8px 12px}
   .row{gap:6px}
   .balls{grid-template-columns:repeat(7,1fr);gap:6px}
   .balls.z2{grid-template-columns:repeat(8,1fr);gap:4px}
@@ -179,29 +181,38 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
 <!-- IMPORT -->
 <section id="v-import">
   <div class="panel">
-    <h2>匯入歷史開獎號碼</h2>
-    <p class="note">可直接上傳台灣彩券官網下載的威力彩 CSV，或把開獎資料貼在下方。每行一期，只要包含「6 個第一區號碼 ＋ 1 個第二區號碼」即可，期別與日期會自動辨識。例如：</p>
-    <pre class="mono note" style="margin:6px 0 10px;background:var(--chip);padding:8px 10px;border-radius:8px;white-space:pre-wrap">114000093, 2025/11/20, 03 11 17 24 30 36, 05
-114000094  2025-11-24  2,8,15,21,29,33  7</pre>
-    <div class="row" style="margin-bottom:8px">
-      <input type="file" id="file" accept=".csv,.txt" multiple>
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h2 style="margin:0">目前資料</h2>
+      <button class="btn primary" id="btnGoPrize">＋ 新增最新一期</button>
     </div>
-    <textarea id="paste" placeholder="把開獎資料貼在這裡…"></textarea>
-    <div class="row" style="margin-top:10px">
-      <button class="btn primary" id="btnImport">加入資料</button>
-      <button class="btn" id="btnReplace">取代現有資料</button>
-      <button class="btn" id="btnPreset">載入內建 2026 年資料</button>
-      <button class="btn" id="btnDemo">產生模擬資料（試玩用）</button>
-      <button class="btn" id="btnClear">清空資料</button>
-    </div>
-    <div id="importMsg" class="note" style="margin-top:8px"></div>
-    <div id="demoWarn" class="warn hidden">目前使用的是<b>隨機產生的模擬資料</b>，不是真實開獎結果，只供熟悉操作。請匯入真實資料後再做分析。</div>
-  </div>
-  <div class="panel">
-    <h2>目前資料</h2>
+    <div id="demoWarn" class="warn hidden" style="margin:0 0 10px">目前使用的是<b>隨機產生的模擬資料</b>，不是真實開獎結果，只供熟悉操作。</div>
     <div class="stats" id="dataStats"></div>
     <h3>最近 10 期</h3>
     <div id="recentList"></div>
+  </div>
+  <div class="panel">
+    <details id="importBox">
+      <summary style="cursor:pointer;list-style:none" class="row"><h2 style="margin:0">匯入歷史開獎資料</h2><span class="note">▸ CSV 檔或貼上文字</span></summary>
+      <div style="margin-top:12px">
+        <p class="note" style="margin:0 0 8px">一次補很多期時才需要用到。每行一期，含 6 個號碼＋第二區，日期會自動辨識；重複的期數會自動略過。</p>
+        <div class="row" style="margin-bottom:8px">
+          <label class="btn" for="file" style="cursor:pointer">📄 選擇 CSV 檔</label>
+          <input type="file" id="file" accept=".csv,.txt" multiple style="display:none">
+        </div>
+        <textarea id="paste" rows="4" style="min-height:90px" placeholder="或貼上開獎資料，例如：&#10;2026-11-23 03 11 17 24 30 36 05"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary" id="btnImport">加入資料</button>
+          <button class="btn" id="btnReplace">取代現有資料</button>
+        </div>
+        <div id="importMsg" class="note" style="margin-top:8px"></div>
+        <div class="row note" style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line)">
+          <span>其他：</span>
+          <button class="btn" id="btnPreset" style="font-size:13px">載入內建 2026 年資料</button>
+          <button class="btn" id="btnDemo" style="font-size:13px">模擬資料（試玩）</button>
+          <button class="btn" id="btnClear" style="font-size:13px">清空資料</button>
+        </div>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -879,6 +890,7 @@ function doImport(replace){
   $('#importMsg').textContent=`辨識 ${out.length} 期，新增 ${added} 期${bad?`，略過 ${bad} 行無法辨識的內容（例如標題列）`:''}。`;
   $('#paste').value='';renderAll();
 }
+$('#btnGoPrize').onclick=()=>{document.querySelector('.tab[data-v=prize]').click();window.scrollTo({top:0,behavior:'smooth'});};
 $('#btnImport').onclick=()=>doImport(false);
 $('#btnReplace').onclick=()=>doImport(true);
 $('#file').onchange=async e=>{
