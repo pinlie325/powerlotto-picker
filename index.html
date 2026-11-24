@@ -53,6 +53,9 @@ select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--lin
 .pickline{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-height:40px}
 .pb{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:"JetBrains Mono",monospace;font-weight:700;color:#fff;background:var(--hot);font-size:14px}
 .pb.z2{background:var(--z2)}
+.pb.miss{background:transparent;color:var(--muted);border:1.5px solid var(--line)}
+.pb.z2.miss{background:transparent}
+.tag.win{background:var(--ok)}.tag.none{background:var(--line);color:var(--muted)}.tag.wait{background:var(--chip);color:var(--muted);border:1px solid var(--line)}
 .pb.empty{background:transparent;border:2px dashed var(--line);color:var(--muted)}
 .mini{width:24px;height:24px;font-size:11px}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
@@ -111,6 +114,7 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
   <button class="tab" data-v="dist">② 獎號分布</button>
   <button class="tab" data-v="prob">③ 號碼機率表</button>
   <button class="tab" data-v="pick">④ 選號與熱度分析</button>
+  <button class="tab" data-v="prize">⑤ 兌獎</button>
 </div>
 
 <!-- IMPORT -->
@@ -235,6 +239,43 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
       </form>
     </details>
     <ul class="saved" id="savedList"></ul>
+  </div>
+</section>
+
+<!-- PRIZE -->
+<section id="v-prize" class="hidden">
+  <div class="grid2">
+    <div class="panel">
+      <h2>新增最新一期開獎號碼</h2>
+      <p class="note" style="margin-top:0">開獎後把號碼輸入這裡：日期、6 個第一區號碼、第二區號碼，用空白或逗號隔開。</p>
+      <div class="row"><input id="newDraw" placeholder="2026-11-23 03 11 17 24 30 36 05" style="flex:1;min-width:240px;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><button class="btn primary" id="btnAddDraw">加入</button></div>
+      <div id="addDrawMsg" class="note" style="margin-top:6px"></div>
+      <h3>目前資料中最新一期</h3>
+      <div id="latestDraw"></div>
+    </div>
+    <div class="panel">
+      <h2>手動對獎</h2>
+      <p class="note" style="margin-top:0">輸入彩券上的號碼（6 個第一區＋最後 1 個第二區），選擇要對的期別。</p>
+      <div class="row"><input id="ticketIn" placeholder="03 11 17 24 30 36 05" style="flex:1;min-width:200px;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"><select id="ticketDraw"></select><button class="btn primary" id="btnCheck">對獎</button></div>
+      <div id="ticketResult" style="margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h2 style="margin:0">我的選號對獎結果</h2>
+      <div class="row"><span class="note">對獎方式</span>
+        <select id="prizeMode"><option value="auto">依儲存時間對應該期</option><option value="sel">全部對同一期</option></select>
+        <select id="prizeDraw" class="hidden"></select>
+      </div>
+    </div>
+    <p class="note" style="margin-top:0">「依儲存時間」：當天 20:00 前存的選號對當天（一、四）開獎，20:00 後存的對下一期。</p>
+    <div class="stats" id="prizeStats" style="margin-bottom:10px"></div>
+    <div style="overflow-x:auto"><table id="prizeTable"></table></div>
+  </div>
+  <div class="panel">
+    <h2>威力彩獎項</h2>
+    <div style="overflow-x:auto"><table id="tierTable"></table></div>
+    <p class="note">頭獎、貳獎為浮動獎金，依當期銷售與累積金額分配，以台灣彩券公告為準。中獎號碼與獎金請以台灣彩券官方公告為準。</p>
   </div>
 </section>
 
@@ -712,13 +753,51 @@ function renderTrail(){
   R.forEach((d,j)=>{if(j%5===0||j===R.length-1){const cx=lw+j*cw+cw/2;g+=`<text x="${cx}" y="${h-8}" text-anchor="middle">${d.date?d.date.slice(5):(d.id||'').slice(-3)}</text>`;}});
   el.innerHTML=g+'</svg>';
 }
+
+// ---------- prize ----------
+const TIERS=[{m:6,s:1,name:'頭獎',amt:null},{m:6,s:0,name:'貳獎',amt:null},{m:5,s:1,name:'參獎',amt:150000},{m:5,s:0,name:'肆獎',amt:20000},{m:4,s:1,name:'伍獎',amt:4000},{m:4,s:0,name:'陸獎',amt:800},{m:3,s:1,name:'柒獎',amt:400},{m:2,s:1,name:'捌獎',amt:200},{m:3,s:0,name:'玖獎',amt:100},{m:1,s:1,name:'普獎',amt:100}];
+function prizeOf(m,s){return TIERS.find(t=>t.m===m&&t.s===(s?1:0))||null;}
+const money=v=>v==null?'浮動獎金':'$'+v.toLocaleString();
+function parseT(t){t=String(t||'');let m=t.match(/(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})/);
+  if(m)return{d:`${m[1]}-${pad(m[2])}-${pad(m[3])}`,hm:+m[4]*60+ +m[5]};
+  m=t.match(/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/);
+  if(m)return{d:`${new Date().getFullYear()}-${pad(m[1])}-${pad(m[2])}`,hm:+m[3]*60+ +m[4]};return null;}
+function nextDrawDate(p){const d=new Date(p.d+'T12:00:00');if(p.hm>=20*60)d.setDate(d.getDate()+1);while(![1,4].includes(d.getDay()))d.setDate(d.getDate()+1);return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function targetDraw(s){const p=parseT(s.t);if(!p)return null;const d=draws.find(d=>d.date&&(d.date>p.d||(d.date===p.d&&p.hm<20*60)));return d||{pending:true,date:nextDrawDate(p)};}
+function check(n,z,d){const hit=n.filter(x=>d.n.includes(x));const s=z===d.z;return{hit,s,pr:prizeOf(hit.length,s)};}
+function ballsHit(n,z,d){return n.map(x=>`<span class="pb mini ${d&&!d.pending&&d.n.includes(x)?'':'miss'}">${pad(x)}</span>`).join('')+`<span class="pb mini z2 ${d&&!d.pending&&d.z===z?'':'miss'}">${pad(z)}</span>`;}
+function drawBalls(d){return d.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join('')+`<span class="pb mini z2">${pad(d.z)}</span>`;}
+function resultTag(r){if(!r)return'<span class="tag none">未中獎</span>';return`<span class="tag win">${r.pr?r.pr.name:''}</span>`;}
+function drawOptions(sel){const ds=draws.filter(d=>d.date||d.id).slice().reverse();return ds.map((d,i)=>`<option value="${keyOf(d)}" ${sel?sel===keyOf(d)?'selected':'':i===0?'selected':''}>${d.date||d.id}</option>`).join('');}
+function findDraw(k){return draws.find(d=>keyOf(d)===k);}
+function renderPrize(){
+  const last=draws[draws.length-1];
+  $('#latestDraw').innerHTML=last?`<div class="row"><span class="mono note">${drawLabel(last)}</span>${drawBalls(last)}</div>`:'<p class="note">還沒有資料。</p>';
+  const tv=$('#ticketDraw').value,pv=$('#prizeDraw').value;
+  $('#ticketDraw').innerHTML=drawOptions(tv);$('#prizeDraw').innerHTML=drawOptions(pv);
+  const mode=$('#prizeMode').value;$('#prizeDraw').classList.toggle('hidden',mode!=='sel');
+  $('#tierTable').innerHTML='<tr><th>獎項</th><th>第一區</th><th>第二區</th><th>獎金</th></tr>'+TIERS.map(t=>`<tr><td>${t.name}</td><td class="mono">${t.m} 個</td><td>${t.s?'✔ 對中':'—'}</td><td class="mono">${money(t.amt)}</td></tr>`).join('');
+  if(!saved.length){$('#prizeStats').innerHTML='';$('#prizeTable').innerHTML='<tr><td class="note" style="text-align:left">還沒有儲存的選號。到「④ 選號」選好號碼後按「儲存這組」。</td></tr>';return;}
+  const selD=mode==='sel'?findDraw($('#prizeDraw').value):null;
+  let done=0,win=0,total=0,floatWin=0,wait=0;
+  const rows=saved.map(s=>{
+    const d=mode==='sel'?selD:targetDraw(s);
+    if(!d||d.pending){wait++;return`<tr><td class="mono note">${String(s.t).replace(/^\d{4}-/,'')}</td><td style="text-align:left">${ballsHit(s.n,s.z,null)}</td><td class="mono">${d?d.date.slice(5)+'（待開獎）':'—'}</td><td></td><td><span class="tag wait">待開獎</span></td><td></td></tr>`;}
+    done++;const r=check(s.n,s.z,d);if(r.pr){win++;if(r.pr.amt==null)floatWin++;else total+=r.pr.amt;}
+    return`<tr><td class="mono note">${String(s.t).replace(/^\d{4}-/,'')}</td><td style="text-align:left">${ballsHit(s.n,s.z,d)}</td><td class="mono">${(d.date||d.id||'').replace(/^\d{4}-/,'')}</td><td style="text-align:left;white-space:nowrap">${drawBalls(d)}</td><td>${r.pr?`<span class="tag win">${r.pr.name}</span>`:'<span class="tag none">未中獎</span>'} <span class="note">${r.hit.length}${r.s?'＋1':''}</span></td><td class="mono">${r.pr?money(r.pr.amt):''}</td></tr>`;
+  });
+  $('#prizeStats').innerHTML=[['已開獎注數',done],['中獎注數',win],['獎金合計',(total?'$'+total.toLocaleString():'$0')+(floatWin?' ＋浮動':'')],['待開獎',wait]].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('#prizeTable').innerHTML='<tr><th>儲存時間</th><th style="text-align:left">我的號碼（實心＝對中）</th><th>對應期別</th><th style="text-align:left">開獎號碼</th><th>結果</th><th>獎金</th></tr>'+rows.join('');
+}
+function savedBadge(s){const d=targetDraw(s);if(!d)return'';if(d.pending)return`<span class="tag wait" style="margin-left:8px">待開獎 ${d.date.slice(5)}</span>`;const r=check(s.n,s.z,d);return r.pr?`<span class="tag win" style="margin-left:8px">${r.pr.name} ${money(r.pr.amt)}</span>`:`<span class="tag none" style="margin-left:8px">${d.date.slice(5)} 未中獎</span>`;}
 function renderSaved(){
-  $('#savedList').innerHTML=saved.length?saved.map((s,i)=>{const hs=S.n?Math.round(s.n.reduce((a,x)=>a+S.heat[x],0)/6):null;return`<li><span class="note mono" style="width:130px" title="${s.synced?'已存到雲端':'只在這個瀏覽器'}">${s.synced?'☁ ':'　 '}${String(s.t).replace(/^\d{4}-/,'')}</span>${s.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join('')}<span class="pb mini z2">${pad(s.z)}</span>${hs!=null?`<span class="note" style="margin-left:8px">熱度 ${hs}</span>`:''}<span style="flex:1"></span><button class="btn" data-load="${i}">載入</button><button class="btn" data-del="${i}">刪除</button></li>`}).join(''):'<li class="note">還沒有儲存的選號。</li>';
+  $('#savedList').innerHTML=saved.length?saved.map((s,i)=>{const hs=S.n?Math.round(s.n.reduce((a,x)=>a+S.heat[x],0)/6):null;return`<li><span class="note mono" style="width:130px" title="${s.synced?'已存到雲端':'只在這個瀏覽器'}">${s.synced?'☁ ':'　 '}${String(s.t).replace(/^\d{4}-/,'')}</span>${s.n.map(x=>`<span class="pb mini">${pad(x)}</span>`).join('')}<span class="pb mini z2">${pad(s.z)}</span>${hs!=null?`<span class="note" style="margin-left:8px">熱度 ${hs}</span>`:''}${savedBadge(s)}<span style="flex:1"></span><button class="btn" data-load="${i}">載入</button><button class="btn" data-del="${i}">刪除</button></li>`}).join(''):'<li class="note">還沒有儲存的選號。</li>';
+  renderPrize();
 }
 
 // ---------- events ----------
 function renderAll(){S=computeStats();renderImport();renderDist();renderProb();renderBalls();renderAnalysis();renderTrail();renderSum();renderSaved();}
-$('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t===b));['import','dist','prob','pick'].forEach(v=>$('#v-'+v).classList.toggle('hidden',v!==b.dataset.v));if(b.dataset.v==='dist')renderDist();};
+$('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(!b)return;document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t===b));['import','dist','prob','pick','prize'].forEach(v=>$('#v-'+v).classList.toggle('hidden',v!==b.dataset.v));if(b.dataset.v==='dist')renderDist();};
 $('#win').onchange=renderAll;
 function doImport(replace){
   const {out,bad}=parseText($('#paste').value);
@@ -749,6 +828,19 @@ $('#btnSave').onclick=()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 �
   store();renderSaved();toast(cloudOn()?'已儲存，同步到雲端中…':'已儲存');cloudSync(true);};
 $('#btnCopy').onclick=async()=>{if(pick.size!==6||!pickZ){toast('請先選滿 6＋1 個號碼');return;}const t=[...pick].sort((a,b)=>a-b).map(pad).join(' ')+' + '+pad(pickZ);try{await navigator.clipboard.writeText(t);toast('已複製：'+t);}catch(e){toast(t);}};
 $('#savedList').onclick=e=>{const l=e.target.dataset.load,d=e.target.dataset.del;if(l!=null){pick=new Set(saved[l].n);pickZ=saved[l].z;refreshPick();toast('已載入');}if(d!=null){const it=saved.splice(d,1)[0];if(it&&it.synced)tomb.push(it.id);store();renderSaved();cloudSync(true);}};
+$('#btnAddDraw').onclick=()=>{const {out}=parseText($('#newDraw').value);const msg=$('#addDrawMsg');
+  if(!out.length){msg.textContent='看不懂這組號碼，請確認有 6 個 1–38 的號碼加 1 個 1–8 的第二區。';msg.style.color='var(--hot)';return;}
+  if(out.some(d=>!d.date)){msg.textContent='請加上開獎日期，例如 2026-11-23。';msg.style.color='var(--hot)';return;}
+  const added=addDraws(out,false);msg.style.color='var(--ok)';msg.textContent=added?`已加入 ${out.map(d=>d.date).join('、')}，對獎結果已更新。`:'這一期已經在資料裡了。';$('#newDraw').value='';renderAll();};
+$('#btnCheck').onclick=()=>{const t=toHalf($('#ticketIn').value);const nums=(t.match(/\d+/g)||[]).map(Number);const out=$('#ticketResult');
+  const n=nums.slice(0,6),z=nums[6];
+  if(nums.length!==7||new Set(n).size!==6||n.some(x=>x<1||x>38)||!(z>=1&&z<=8)){out.innerHTML='<p class="note" style="color:var(--hot)">請輸入 6 個不重複的 1–38 號碼，最後再加 1 個 1–8 的第二區號碼。</p>';return;}
+  const d=findDraw($('#ticketDraw').value);if(!d){out.innerHTML='<p class="note">請先選擇期別。</p>';return;}
+  const r=check(n.sort((a,b)=>a-b),z,d);
+  out.innerHTML=`<div class="row" style="margin-bottom:6px"><span class="note">你的號碼</span>${ballsHit(n,z,d)}</div><div class="row" style="margin-bottom:8px"><span class="note">開獎號碼</span>${drawBalls(d)}</div>`+(r.pr?`<div><span class="tag win" style="font-size:15px;padding:3px 12px">${r.pr.name}</span> <b class="mono">${money(r.pr.amt)}</b> <span class="note">（第一區中 ${r.hit.length} 個${r.s?'，第二區對中':''}）</span></div>`:`<div><span class="tag none">未中獎</span> <span class="note">第一區中 ${r.hit.length} 個${r.s?'，第二區對中':'，第二區未中'}</span></div>`);};
+$('#ticketIn').onkeydown=e=>{if(e.key==='Enter')$('#btnCheck').click();};
+$('#newDraw').onkeydown=e=>{if(e.key==='Enter')$('#btnAddDraw').click();};
+$('#prizeMode').onchange=renderPrize;$('#prizeDraw').onchange=renderPrize;
 $('#cloudForm').onsubmit=e=>{e.preventDefault();cloud.url=$('#cloudUrl').value.trim()||DEFAULT_CLOUD_URL;cloud.key=$('#cloudKey').value;if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(cloud.url)){setCloud('☁ 雲端網址格式不對，請清空「進階」裡的網址','err');return;}if(!cloud.key){setCloud('☁ 請輸入同步密碼','err');return;}try{localStorage.setItem('pl638cloud',JSON.stringify(cloud));}catch(e){}cloudSync();};
 $('#btnCloudSync').onclick=()=>{if(!cloudOn()){setCloud('☁ 請先填入網址和密碼','err');return;}cloudSync();};
 $('#btnCloudOff').onclick=()=>{cloud={url:DEFAULT_CLOUD_URL,key:''};try{localStorage.removeItem('pl638cloud');}catch(e){}$('#cloudUrl').value='';$('#cloudKey').value='';saved.forEach(x=>x.synced=false);tomb=[];store();setCloud('☁ 已中斷雲端，紀錄只存在這個瀏覽器');};
