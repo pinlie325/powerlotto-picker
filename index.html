@@ -2,7 +2,10 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#15140f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="威力彩選號">
 <title>威力彩選號分析機</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -80,6 +83,62 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
 .hidden{display:none}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);padding:8px 16px;border-radius:999px;font-size:14px;opacity:0;transition:.25s;pointer-events:none}
 #toast.on{opacity:1}
+.ts{display:none}
+.grid2>*{min-width:0}
+.panel{min-width:0}
+@media (max-width:640px){
+  body{font-size:15px}
+  .wrap{padding:14px 10px calc(84px + env(safe-area-inset-bottom))}
+  header{gap:8px;margin-bottom:10px}
+  h1{font-size:22px}
+  h1 small{display:block;margin:2px 0 0;font-size:12.5px}
+  header>.row{width:100%;gap:6px}
+  header>.row .note{font-size:12px}
+  h2{font-size:16px}
+  .panel{padding:14px 12px;border-radius:12px;margin-bottom:12px}
+  .grid2{gap:0}
+  /* bottom tab bar */
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;gap:0;display:grid;grid-template-columns:repeat(5,1fr);
+    background:var(--panel);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(0,0,0,.08)}
+  .tab{border:0;border-radius:10px;padding:5px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:12px;background:transparent}
+  .tab b{font-size:17px;font-weight:500;line-height:1.1}
+  .tab.on{background:var(--chip);color:var(--ink)}
+  .tab.on b{color:var(--hot)}
+  .tl{display:none}.ts{display:inline}
+  /* touch-friendly controls; 16px stops iOS zoom */
+  input,select,textarea{font-size:16px!important}
+  button.btn{min-height:40px;padding:8px 12px}
+  .row{gap:6px}
+  .balls{grid-template-columns:repeat(7,1fr);gap:6px}
+  .balls.z2{grid-template-columns:repeat(8,1fr);gap:4px}
+  .ball{font-size:14px}
+  .pickline{gap:4px}
+  .pb{width:34px;height:34px;font-size:13px}
+  .pb.mini{width:24px;height:24px;font-size:11px}
+  .bar{display:none}
+  table{font-size:13px}
+  th,td{padding:6px 4px}
+  .kv{grid-template-columns:96px 1fr;font-size:13.5px}
+  .stats{grid-template-columns:repeat(2,1fr);gap:8px}
+  .stat b{font-size:18px}
+  .scorebig{font-size:36px}
+  .saved li{gap:4px}
+  .saved li .note.mono{width:100%!important}
+  #toast{bottom:calc(76px + env(safe-area-inset-bottom))}
+  /* prize results as cards */
+  #prizeTable,#prizeTable tbody{display:block}
+  #prizeTable tr:first-child{display:none}
+  #prizeTable tr{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  #prizeTable td{border:0;padding:0;text-align:left!important;display:flex;align-items:center;flex-wrap:wrap;gap:3px}
+  #prizeTable td::before{content:attr(data-l);color:var(--muted);font-size:12px;min-width:60px}
+  #prizeTable td[data-l]{grid-column:1/-1}
+  #prizeTable td.res{grid-row:1;grid-column:2}
+  #prizeTable td.amt{grid-row:1;grid-column:3;font-weight:700}
+  #prizeTable td:empty{display:none}
+  #cloudKey{flex:1;min-width:0;width:auto!important}
+  #newDraw,#ticketIn{min-width:0!important;flex:1 1 100%!important}
+  #ticketDraw{flex:1}
+}
 .scorebig{font-size:42px;font-weight:900;font-family:"JetBrains Mono",monospace;line-height:1}
 </style>
 </head>
@@ -90,31 +149,31 @@ svg text{fill:var(--muted);font-family:"JetBrains Mono",monospace;font-size:10px
     <h1>威力彩選號分析機<small>第一區 1–38 選 6 ＋ 第二區 1–8 選 1</small></h1>
   </div>
   <div class="row">
-    <span class="note">自動同步</span>
+    <span style="white-space:nowrap"><span class="note">自動同步</span>
     <select id="autoSync" title="每隔一段時間自動從雲端抓最新的選號紀錄">
       <option value="0">關閉</option>
       <option value="1">每 1 分鐘</option>
       <option value="5" selected>每 5 分鐘</option>
       <option value="15">每 15 分鐘</option>
-    </select>
+    </select></span>
     <button class="btn" id="btnRefresh" title="同步雲端紀錄後重新載入最新版網頁">⟳ 重新整理</button>
-    <span class="note" style="margin-left:6px">統計範圍</span>
+    <span style="white-space:nowrap"><span class="note" style="margin-left:6px">統計範圍</span>
     <select id="win">
       <option value="30">近 30 期</option>
       <option value="50">近 50 期</option>
       <option value="100" selected>近 100 期</option>
       <option value="200">近 200 期</option>
       <option value="0">全部</option>
-    </select>
+    </select></span>
   </div>
 </header>
 
 <div class="tabs" id="tabs">
-  <button class="tab on" data-v="import">① 匯入資料</button>
-  <button class="tab" data-v="dist">② 獎號分布</button>
-  <button class="tab" data-v="prob">③ 號碼機率表</button>
-  <button class="tab" data-v="pick">④ 選號與熱度分析</button>
-  <button class="tab" data-v="prize">⑤ 兌獎</button>
+  <button class="tab on" data-v="import"><b>①</b> <span class="tl">匯入資料</span><span class="ts">匯入</span></button>
+  <button class="tab" data-v="dist"><b>②</b> <span class="tl">獎號分布</span><span class="ts">分布</span></button>
+  <button class="tab" data-v="prob"><b>③</b> <span class="tl">號碼機率表</span><span class="ts">機率</span></button>
+  <button class="tab" data-v="pick"><b>④</b> <span class="tl">選號與熱度分析</span><span class="ts">選號</span></button>
+  <button class="tab" data-v="prize"><b>⑤</b> <span class="tl">兌獎</span><span class="ts">兌獎</span></button>
 </div>
 
 <!-- IMPORT -->
@@ -581,16 +640,19 @@ let S=null;
 
 // ---------- rendering helpers ----------
 const col=c=>`var(--${c})`;
+const isMobile=()=>window.innerWidth<640;
 function svgBars(vals,labels,opts){
-  const w=Math.max(opts.minW||600,labels.length*(opts.bw||22)),h=opts.h||220,pt=14,pb=24,pl=30;
+  const M=isMobile();if(M){const n=labels.length;opts=Object.assign({},opts,{bw:Math.max(9,Math.min(40,Math.floor(330/n))),minW:1,h:Math.min(opts.h||220,190)});if(opts.bw<15)opts.valTop=false;}
+  const w=M?Math.max(330,labels.length*opts.bw+36):Math.max(opts.minW||600,labels.length*(opts.bw||22)),h=opts.h||220,pt=14,pb=24,pl=30;
   const max=Math.max(1,opts.max??Math.max(...vals,opts.ref||0))*1.08;
   const bw=(w-pl-6)/labels.length;
-  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:${Math.min(w,opts.minW||600)}px">`;
+  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:${M?0:Math.min(w,opts.minW||600)}px">`;
+  const thin=M&&(bw<15||(String(labels[0]).length>2&&bw<26));
   const ticks=4;for(let t=0;t<=ticks;t++){const v=max/1.08*t/ticks,y=h-pb-(v/max)*(h-pt-pb);g+=`<line x1="${pl}" x2="${w}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-4}" y="${y+3}" text-anchor="end">${Math.round(v)}</text>`;}
   vals.forEach((v,i)=>{const bh=(v/max)*(h-pt-pb),x=pl+i*bw+2,y=h-pb-bh;
     g+=`<rect x="${x}" y="${y}" width="${bw-4}" height="${bh}" rx="3" fill="${opts.color(i)}"><title>${labels[i]}：${opts.fmt?opts.fmt(v):v}</title></rect>`;
     if(opts.valTop)g+=`<text x="${x+(bw-4)/2}" y="${y-3}" text-anchor="middle">${v}</text>`;
-    g+=`<text x="${x+(bw-4)/2}" y="${h-8}" text-anchor="middle" style="fill:var(--ink)">${labels[i]}</text>`;});
+    if(!thin||i%2===0)g+=`<text x="${x+(bw-4)/2}" y="${h-8}" text-anchor="middle" style="fill:var(--ink)${thin?";font-size:8.5px":""}">${labels[i]}</text>`;});
   if(opts.ref!=null){const y=h-pb-(opts.ref/max)*(h-pt-pb);g+=`<line x1="${pl}" x2="${w}" y1="${y}" y2="${y}" stroke="var(--ink)" stroke-dasharray="5 4" opacity=".6"/><text x="${w-4}" y="${y-4}" text-anchor="end" style="fill:var(--ink)">期望 ${opts.ref.toFixed(1)}</text>`;}
   if(opts.marker!=null){const x=pl+opts.marker*bw+bw/2;g+=`<line x1="${x}" x2="${x}" y1="${pt}" y2="${h-pb}" stroke="var(--hot)" stroke-width="2"/><text x="${x+4}" y="${pt+8}" style="fill:var(--hot)">你的組合</text>`;}
   return g+'</svg>';
@@ -617,14 +679,14 @@ function renderDist(){
   $('#chOmit').innerHTML=svgBars(om,L,{color:i=>om[i]>=12?col('cold'):om[i]<=2?col('hot'):col('warm'),minW:560,bw:15,h:200,fmt:v=>v+' 期'});
   $('#chZ2').innerHTML=svgBars(S.cnt2.slice(1),[1,2,3,4,5,6,7,8].map(pad),{ref:S.exp2,valTop:true,color:i=>col(S.cls2(i+1)),minW:320,bw:40,h:200});
   // heat map recent 30
-  const R=S.W.slice(-30).reverse(),cw=19,rh=15,lw=86,w=lw+N1*cw+cw*1.6,h=R.length*rh+22;
-  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:820px">`;
-  for(let x=1;x<=N1;x++)g+=`<text x="${lw+(x-.5)*cw}" y="11" text-anchor="middle">${pad(x)}</text>`;
-  g+=`<text x="${lw+N1*cw+cw*.8}" y="11" text-anchor="middle">二區</text>`;
+  const M=isMobile(),R=S.W.slice(-30).reverse(),cw=M?8:19,rh=M?10:15,lw=M?36:86,w=lw+N1*cw+cw*1.8,h=R.length*rh+22;
+  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:${M?0:820}px">`;
+  for(let x=1;x<=N1;x++)if(!M||x===1||x%5===0)g+=`<text x="${lw+(x-.5)*cw}" y="11" text-anchor="middle" ${M?'style="font-size:7px"':''}>${pad(x)}</text>`;
+  g+=`<text x="${lw+N1*cw+cw*.9}" y="11" text-anchor="middle" ${M?'style="font-size:7px"':''}>二區</text>`;
   R.forEach((d,r)=>{const y=16+r*rh;
-    g+=`<text x="${lw-6}" y="${y+10}" text-anchor="end">${d.date?d.date.slice(2):(d.id||'')}</text>`;
+    g+=`<text x="${lw-4}" y="${y+(M?7.5:10)}" text-anchor="end" ${M?'style="font-size:7px"':''}>${d.date?(M?d.date.slice(5):d.date.slice(2)):(d.id||'')}</text>`;
     for(let x=1;x<=N1;x++){const hit=d.n.includes(x);g+=`<rect x="${lw+(x-1)*cw+1}" y="${y}" width="${cw-2}" height="${rh-2}" rx="2" fill="${hit?'var(--hot)':'var(--chip)'}"/>`;}
-    g+=`<rect x="${lw+N1*cw+4}" y="${y}" width="${cw*1.4}" height="${rh-2}" rx="2" fill="var(--z2)"/><text x="${lw+N1*cw+4+cw*.7}" y="${y+10}" text-anchor="middle" style="fill:#fff">${d.z}</text>`;
+    g+=`<rect x="${lw+N1*cw+3}" y="${y}" width="${cw*1.5}" height="${rh-2}" rx="2" fill="var(--z2)"/><text x="${lw+N1*cw+3+cw*.75}" y="${y+(M?7:10)}" text-anchor="middle" style="fill:#fff${M?';font-size:7px':''}">${d.z}</text>`;
   });
   $('#chMap').innerHTML=g+'</svg>';
 }
@@ -736,22 +798,23 @@ function renderTrail(){
   const arr=[...pick].sort((a,b)=>a-b);
   const rowsDef=arr.map(x=>({x,z:false})).concat(pickZ?[{x:pickZ,z:true}]:[]);
   if(!rowsDef.length){el.innerHTML='<p class="note">在上方選號後，這裡會顯示每個號碼最近 30 期有沒有開出。</p>';return;}
-  const R=S.W.slice(-30),cw=24,rh=34,lw=56,rw=150,top=10,w=lw+R.length*cw+rw,h=top+rowsDef.length*rh+28;
-  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:760px">`;
+  const M=isMobile(),R=S.W.slice(-30),cw=M?10:24,rh=M?30:34,lw=M?32:56,rw=M?66:150,top=10,w=lw+R.length*cw+rw,h=top+rowsDef.length*rh+28;
+  const br=M?12:14,hr=M?4.3:8,mr=M?1.4:2.5;
+  let g=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:${M?0:760}px">`;
   // newest column highlight
   g+=`<rect x="${lw+(R.length-1)*cw}" y="${top-4}" width="${cw}" height="${rowsDef.length*rh+4}" rx="4" fill="var(--chip)"/>`;
   rowsDef.forEach((r,i)=>{
     const y=top+i*rh+rh/2,colr=r.z?'var(--z2)':col(S.cls(r.x));
-    g+=`<circle cx="22" cy="${y}" r="14" fill="${r.z?'var(--z2)':'var(--hot)'}"/><text x="22" y="${y+4}" text-anchor="middle" style="fill:#fff;font-size:12px;font-weight:700">${pad(r.x)}</text>`;
+    g+=`<circle cx="${M?13:22}" cy="${y}" r="${br}" fill="${r.z?'var(--z2)':'var(--hot)'}"/><text x="${M?13:22}" y="${y+4}" text-anchor="middle" style="fill:#fff;font-size:${M?10:12}px;font-weight:700">${pad(r.x)}</text>`;
     g+=`<line x1="${lw}" x2="${lw+R.length*cw}" y1="${y}" y2="${y}" stroke="var(--line)"/>`;
     let hits=0,lastHit=-1;
     R.forEach((d,j)=>{const hit=r.z?d.z===r.x:d.n.includes(r.x);const cx=lw+j*cw+cw/2;
-      if(hit){hits++;lastHit=j;g+=`<circle cx="${cx}" cy="${y}" r="8" fill="${colr}"><title>${drawLabel(d)} 開出 ${pad(r.x)}</title></circle>`;}
-      else g+=`<circle cx="${cx}" cy="${y}" r="2.5" fill="var(--line)"/>`;});
+      if(hit){hits++;lastHit=j;g+=`<circle cx="${cx}" cy="${y}" r="${hr}" fill="${colr}"><title>${drawLabel(d)} 開出 ${pad(r.x)}</title></circle>`;}
+      else g+=`<circle cx="${cx}" cy="${y}" r="${mr}" fill="var(--line)"/>`;});
     const gap=r.z?S.omit2[r.x]:S.omit[r.x];
-    g+=`<text x="${lw+R.length*cw+12}" y="${y+4}" style="fill:var(--ink);font-size:12px">${hits} 次・遺漏 ${gap} 期</text>`;
+    g+=`<text x="${lw+R.length*cw+(M?6:12)}" y="${y+4}" style="fill:var(--ink);font-size:${M?10:12}px">${M?`${hits}次 遺${gap}`:`${hits} 次・遺漏 ${gap} 期`}</text>`;
   });
-  R.forEach((d,j)=>{if(j%5===0||j===R.length-1){const cx=lw+j*cw+cw/2;g+=`<text x="${cx}" y="${h-8}" text-anchor="middle">${d.date?d.date.slice(5):(d.id||'').slice(-3)}</text>`;}});
+  R.forEach((d,j)=>{if(j%(M?10:5)===0||j===R.length-1){const cx=lw+j*cw+cw/2;g+=`<text x="${cx}" y="${h-8}" text-anchor="middle" ${M?'style="font-size:8px"':''}>${d.date?d.date.slice(5):(d.id||'').slice(-3)}</text>`;}});
   el.innerHTML=g+'</svg>';
 }
 
@@ -783,9 +846,9 @@ function renderPrize(){
   let done=0,win=0,total=0,floatWin=0,wait=0;
   const rows=saved.map(s=>{
     const d=mode==='sel'?selD:targetDraw(s);
-    if(!d||d.pending){wait++;return`<tr><td class="mono note">${String(s.t).replace(/^\d{4}-/,'')}</td><td style="text-align:left">${ballsHit(s.n,s.z,null)}</td><td class="mono">${d?d.date.slice(5)+'（待開獎）':'—'}</td><td></td><td><span class="tag wait">待開獎</span></td><td></td></tr>`;}
+    if(!d||d.pending){wait++;return`<tr><td class="mono note">${String(s.t).replace(/^\d{4}-/,'')}</td><td class="res"><span class="tag wait">待開獎</span></td><td style="text-align:left" data-l="我的號碼">${ballsHit(s.n,s.z,null)}</td><td class="mono" data-l="對應期別">${d?d.date.slice(5)+'（待開獎）':'—'}</td><td></td><td></td></tr>`;}
     done++;const r=check(s.n,s.z,d);if(r.pr){win++;if(r.pr.amt==null)floatWin++;else total+=r.pr.amt;}
-    return`<tr><td class="mono note">${String(s.t).replace(/^\d{4}-/,'')}</td><td style="text-align:left">${ballsHit(s.n,s.z,d)}</td><td class="mono">${(d.date||d.id||'').replace(/^\d{4}-/,'')}</td><td style="text-align:left;white-space:nowrap">${drawBalls(d)}</td><td>${r.pr?`<span class="tag win">${r.pr.name}</span>`:'<span class="tag none">未中獎</span>'} <span class="note">${r.hit.length}${r.s?'＋1':''}</span></td><td class="mono">${r.pr?money(r.pr.amt):''}</td></tr>`;
+    return`<tr><td class="mono note">${String(s.t).replace(/^\d{4}-/,'')}</td><td style="text-align:left" data-l="我的號碼">${ballsHit(s.n,s.z,d)}</td><td class="mono" data-l="對應期別">${(d.date||d.id||'').replace(/^\d{4}-/,'')}</td><td style="text-align:left;white-space:nowrap" data-l="開獎號碼">${drawBalls(d)}</td><td class="res">${r.pr?`<span class="tag win">${r.pr.name}</span>`:'<span class="tag none">未中獎</span>'} <span class="note">${r.hit.length}${r.s?'＋1':''}</span></td><td class="mono amt">${r.pr?money(r.pr.amt):''}</td></tr>`;
   });
   $('#prizeStats').innerHTML=[['已開獎注數',done],['中獎注數',win],['獎金合計',(total?'$'+total.toLocaleString():'$0')+(floatWin?' ＋浮動':'')],['待開獎',wait]].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
   $('#prizeTable').innerHTML='<tr><th>儲存時間</th><th style="text-align:left">我的號碼（實心＝對中）</th><th>對應期別</th><th style="text-align:left">開獎號碼</th><th>結果</th><th>獎金</th></tr>'+rows.join('');
@@ -846,6 +909,7 @@ $('#cloudForm').onsubmit=e=>{e.preventDefault();cloud.url=$('#cloudUrl').value.t
 $('#btnCloudSync').onclick=()=>{if(!cloudOn()){setCloud('☁ 請先填入網址和密碼','err');return;}cloudSync();};
 $('#btnCloudOff').onclick=()=>{cloud={url:DEFAULT_CLOUD_URL,key:''};try{localStorage.removeItem('pl638cloud');}catch(e){}$('#cloudUrl').value='';$('#cloudKey').value='';saved.forEach(x=>x.synced=false);tomb=[];store();setCloud('☁ 已中斷雲端，紀錄只存在這個瀏覽器');};
 
+let rzT=null,lastM=null;window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{const m=isMobile();if(m!==lastM){lastM=m;renderDist();renderTrail();renderSum();}},200);});
 load();if(!draws.length){addDraws(parseText(PRESET).out,true);}renderAll();
 $('#cloudUrl').value=cloud.url===DEFAULT_CLOUD_URL?'':cloud.url;$('#cloudKey').value=cloud.key;if(cloudOn())cloudSync(true);
 // ---------- refresh & auto sync ----------
